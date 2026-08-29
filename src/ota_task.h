@@ -41,6 +41,10 @@
 // - "No update available" (the fetched release matches the running version)
 //   is not a failure: it reports OTA_DONE with busy=false and error=nullptr.
 #pragma once
+// v0.0.2: first release published to exercise the full install path end to end
+// on hardware -- download, SHA-256 against the signed manifest, spare-slot
+// write, reboot and the five-minute health gate. Comment-only on purpose: the
+// update mechanism is the only variable under test.
 #ifdef ARDUINO
 #include <stdint.h>
 
