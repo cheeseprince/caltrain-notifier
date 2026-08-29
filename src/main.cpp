@@ -447,6 +447,21 @@ void setup() {
   delay(200);
   Serial.println();
   Serial.println("=== Caltrain Notifier ===");
+  // ===== DELIBERATELY BROKEN BUILD — v0.0.3 rollback test =====================
+  // Restarts before reaching the health gate, so this image can never call
+  // esp_ota_mark_app_valid_cancel_rollback(). The bootloader must then see
+  // ESP_OTA_IMG_PENDING_VERIFY on the NEXT boot, flip it to ESP_OTA_IMG_ABORTED
+  // and refuse to select this slot again -- reverting to the previous build
+  // with no involvement from our own five-minute timer.
+  //
+  // This commit exists only to be tagged v0.0.3 and is reverted immediately
+  // afterwards. Do not build it for a real device.
+  Serial.println("[TEST] v0.0.3 is deliberately broken: restarting without marking valid");
+  Serial.flush();
+  delay(2000);
+  ESP.restart();
+  // ===========================================================================
+
 #ifdef FW_DATE
   Serial.printf("[BUILD] %s\n", FW_DATE);
 #endif
