@@ -324,8 +324,13 @@ jobs:
       # silently change what gets built between the day it's tested and the
       # day it's released. Pinned to the version this project has actually
       # been built and tested with (`pip show platformio` on the dev machine).
+      # Hash-pinned via requirements.txt, not just version-pinned here: a
+      # version alone does not stop different bytes being served under the
+      # same version number later. --require-hashes refuses anything that
+      # does not match the sha256 set pinned in that file -- see its header
+      # for how it was generated and how to regenerate it on a version bump.
       - name: Install PlatformIO
-        run: pip install platformio==6.1.19
+        run: pip install --require-hashes -r requirements.txt
       # Both board revisions build. They differ only in TOUCH_CS/TFT_MISO, which
       # is exactly the kind of difference that compiles on one and not the other.
       - name: Build ${{ matrix.environment }}
