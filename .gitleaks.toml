@@ -1,0 +1,95 @@
+# gitleaks configuration.
+#
+# WHY THIS FILE EXISTS. gitleaks' default ruleset is built around provider
+# secrets with recognisable prefixes — `ghp_`, `AKIA`, `xoxb-` and so on. This
+# project's only credential is a **511.org API token, which is a bare UUID**.
+# It carries no prefix and its entropy is unremarkable, so the default rules do
+# not see it. Measured, not assumed: gitleaks 8.30.1 with default rules scanned
+# a file containing a 511-shaped UUID and a full `api_key=<uuid>` URL and
+# reported "no leaks found", exit 0 — while catching a synthetic GitHub PAT and
+# an AWS key in the same run. Without the rules below, CI would return a
+# confident green on the one secret this repository actually has to keep out.
+#
+# WHAT IS CAUGHT, and what is not. A guard is only as good as its patterns, so
+# they are stated rather than implied:
+#
+#   CAUGHT  dashed UUID           00000000-0000-0000-0000-000000000000
+#   CAUGHT  in a query string     ...?api_key=00000000-0000-...&agency=CT
+#   CAUGHT  dashless 32-hex       0000000000000000000000000000000
+#   CAUGHT  separator-wrapped     token_00000000-...-000_capture.json
+#           (the regex uses no \b, so `_` and `-` do not hide a match)
+#   NOT     split across lines or whitespace
+#   NOT     base64 or other re-encodings of the token
+#   NOT     a token pasted into a binary asset -- CONFIRMED, not assumed:
+#           a UUID in a PNG tEXt chunk was missed by both `gitleaks git`
+#           and `gitleaks dir`, while the same string in a .txt was caught
+#           by both. CI closes this separately by asserting that every
+#           committed image carries no metadata chunks at all.
+#
+# ALLOWLISTING IS BY VALUE, NEVER BY PATH. There is deliberately no path
+# exemption anywhere in this file — not for the test suite, not for the docs,
+# and above all not for this file itself. A guard that skips its own file has a
+# blind spot exactly where illustrative examples accumulate, which is how a real
+# VIN reached a public repository on a sibling project: the guard exempted
+# itself, printed OK, and CI agreed. Every value below is synthetic and must
+# stay that way.
+
+title = "caltrain-notifier"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "511-api-token-uuid"
+description = "511.org API token (UUID form) — a per-user credential that belongs in NVS, never in the tree"
+regex = '''[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'''
+tags = ["credential", "511"]
+
+  [rules.allowlist]
+  # SYNTHETIC VALUES ONLY, allowlisted BY VALUE and never by path.
+  #
+  # This list must enumerate every UUID-shaped string that legitimately appears
+  # anywhere in the tree — including the illustrative ones in this file's own
+  # comments. That is deliberate: it means a self-scan of this file (see the CI
+  # step "scan the scanner's own config") is GREEN today and goes RED the moment
+  # anyone adds a UUID that is not on this list. An un-enumerated example cannot
+  # hide here.
+  #
+  # None of these has any relation to an issued token. If you add an example,
+  # add it here too — and generate it, never paste one from an audit report or a
+  # terminal transcript.
+  regexes = [
+    '''12345678-1234-1234-1234-123456789abc''',  # test/test_config.cpp
+    '''00000000-0000-4000-8000-000000000000''',  # canonical nil-ish v4
+    '''00000000-0000-0000-0000-000000000000''',  # doc example, this file
+    '''00000000-1111-4222-8333-444444444444''',  # doc example, this file
+  ]
+
+# NOTE ON REGEX DIALECT. gitleaks compiles with RE2, which has no lookahead.
+# `(?!...)` makes the binary panic at config-load time rather than fail a scan,
+# which would be a gate that never runs at all. Exclusions therefore live in
+# value-based allowlists below, which is where they belong regardless.
+
+[[rules]]
+id = "511-api-token-dashless"
+description = "511.org API token with its dashes stripped — 32 bare hex characters in a credential context"
+regex = '''(?i)(api[_-]?key|token)["'= :]{1,4}[0-9a-fA-F]{32}'''
+tags = ["credential", "511"]
+
+[[rules]]
+id = "511-api-key-in-url"
+description = "A 511 request URL carrying a live api_key value rather than a placeholder"
+regex = '''api_key=[A-Za-z0-9][A-Za-z0-9-]{7,}'''
+tags = ["credential", "511"]
+
+  [rules.allowlist]
+  # Placeholders, not credentials. `%s` is the printf slot in siri_client.cpp,
+  # where the token is substituted at runtime from NVS and never at compile time.
+  regexes = [
+    '''api_key=%s''',
+    '''api_key=REDACTED''',
+    '''api_key=YOUR''',
+    '''api_key=\{''',
+    '''api_key=00000000-1111-4222-8333-444444444444''',
+    '''api_key=00000000-0000-''',   # truncated doc example, this file
+  ]

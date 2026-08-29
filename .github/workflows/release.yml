@@ -1,0 +1,192 @@
+# Release: build both board revisions, sign the manifest, publish to
+# gh-pages for devices to fetch over the air.
+#
+# Cut a release with:
+#   git tag v1.2.0 && git push --tags
+# or run manually from the Actions tab (workflow_dispatch) to produce a
+# dev-<hash> build without cutting a tag.
+#
+# THREE DELIBERATE DIVERGENCES from the sibling project's release.yml
+# (obd-gauge-cluster), all because this device installs updates unattended
+# and trusts no unsigned manifest at all -- src/ota_verify.h, which has no
+# transition mode:
+#
+#   1. The signing step FAILS (`exit 1`) when OTA_SIGNING_KEY is absent. obd
+#      publishes unsigned in that case; here, every device would refuse the
+#      result, which looks identical to a healthy release until a sign
+#      quietly stops updating.
+#   2. The `prove-gate` job below proves that guard can actually fail, the
+#      same way ci.yml's secret scanner proves itself against a planted
+#      secret before its "clean" result is trusted.
+#   3. The `Verify the signature` step re-checks manifest.sig against the
+#      PUBLIC key this repo's firmware actually ships with (src/ota_pubkey.h)
+#      before publishing, catching a stale/rotated OTA_SIGNING_KEY secret
+#      here rather than on a desk sign that silently stops updating.
+#
+# Every third-party action is pinned to a 40-character commit SHA, matching
+# ci.yml's convention -- resolved from each action's release tag via the
+# GitHub API, not typed from memory. PlatformIO is pinned to the exact
+# version ci.yml's device-build job uses (6.1.19): this is the build that
+# produces the binary being cryptographically signed, so an unpinned
+# toolchain would make the signed artifact non-reproducible.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+# Read-only by default, like ci.yml. Only the job that pushes to gh-pages
+# needs write access, and it declares that itself.
+permissions:
+  contents: read
+
+concurrency:
+  # Never cancel a release that is already publishing partway through a
+  # gh-pages push -- an aborted push there can leave the branch holding one
+  # board revision's binary but not the other's manifest line.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------
+  # DIVERGENCE 2. A gate nobody has seen fail is not known to work -- the
+  # same reasoning as ci.yml's "Prove the gate can fail" step for the secret
+  # scanner (.github/workflows/ci.yml:63). This runs the exact guard logic
+  # from the "Sign the manifest" step below with an empty key and requires a
+  # non-zero exit, BEFORE the real release job is allowed to run.
+  # ---------------------------------------------------------------------
+  prove-gate:
+    name: Prove the unsigned-release gate can fail
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: An empty signing key must abort
+        run: |
+          set +e
+          OTA_SIGNING_KEY="" bash -c '
+            if [ -z "${OTA_SIGNING_KEY:-}" ]; then
+              echo "refusing to publish an unsigned release"; exit 1
+            fi'
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::the gate did not fail on an empty key"; exit 1
+          fi
+          echo "gate correctly refused (exit $rc)"
+
+  release:
+    name: Build, sign, and publish
+    needs: prove-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # only this job pushes (to gh-pages, via GITHUB_TOKEN)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0   # needed for `git describe`-style tag resolution below
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+
+      # Same pin ci.yml's device-build job uses. This build is the one being
+      # signed and shipped over the air, so its toolchain must be exactly
+      # reproducible -- see the header comment above.
+      - name: Install PlatformIO
+        run: pip install platformio==6.1.19
+
+      - name: Stamp the firmware version
+        run: |
+          GIT=$(git rev-parse --short HEAD)
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then VERSION="$GITHUB_REF_NAME"; else VERSION="dev-$GIT"; fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          # Matches src/fw_version.h's actual spacing exactly (single space
+          # after each macro name, not the aligned form some doc examples
+          # use) -- a mismatched pattern here would silently sed-no-op and
+          # ship a release stamped "dev-local".
+          sed -i "s/#define FW_GIT \".*\"/#define FW_GIT \"$GIT\"/" src/fw_version.h
+          sed -i "s/#define FW_VERSION \".*\"/#define FW_VERSION \"$VERSION\"/" src/fw_version.h
+          grep -E '#define FW_(VERSION|GIT)' src/fw_version.h
+
+      # Both board revisions, always -- every release must carry both, or a
+      # v2.0 unit can never update (src/ota_manifest.h: matching is exact, no
+      # fallback from one environment name to another).
+      - name: Build caltrain
+        run: pio run -e caltrain
+
+      - name: Build caltrain_v20
+        run: pio run -e caltrain_v20
+
+      # One manifest line per environment, in the EXACT format otaManifestFind()
+      # parses (src/ota_manifest.cpp): "<env> <version> <sha256hex> <sizebytes>
+      # <filename>", single spaces, each line newline-terminated by `echo`.
+      # The parser rejects any trailing content after the filename, so nothing
+      # here appends anything past it.
+      - name: Assemble the release
+        run: |
+          mkdir -p out
+          : > out/manifest.txt
+          for e in caltrain caltrain_v20; do
+            BIN=.pio/build/$e/firmware.bin
+            SHA=$(sha256sum "$BIN" | cut -d' ' -f1)
+            SIZE=$(stat -c%s "$BIN")
+            cp "$BIN" "out/$e.bin"
+            echo "$e $VERSION $SHA $SIZE $e.bin" >> out/manifest.txt
+          done
+          cat out/manifest.txt
+
+      - name: Sign the manifest
+        env:
+          OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}
+        run: |
+          # DIVERGENCE 1. Not optional, and not "skip and publish anyway"
+          # (which is what obd-gauge-cluster does here). A release without a
+          # valid signature is refused by every device (src/ota_verify.h --
+          # there is no transition mode), so publishing one unsigned would
+          # ship a channel that silently updates nothing.
+          if [ -z "${OTA_SIGNING_KEY:-}" ]; then
+            echo "::error::OTA_SIGNING_KEY is not set; refusing to publish an unsigned release"
+            exit 1
+          fi
+          printf '%s' "$OTA_SIGNING_KEY" > /tmp/otakey.pem
+          openssl dgst -sha256 -sign /tmp/otakey.pem -out out/manifest.sig out/manifest.txt
+          rm -f /tmp/otakey.pem
+          echo "manifest.sig written ($(stat -c%s out/manifest.sig) bytes)"
+
+      # DIVERGENCE 3. Verify the signature just produced against the PUBLIC
+      # key this repo's firmware actually ships with, before publishing
+      # anything. This is what catches a rotated-on-one-side-only
+      # OTA_SIGNING_KEY secret HERE -- a release that fails this step never
+      # reaches gh-pages -- rather than on a desk sign that fetches a
+      # manifest it can never verify and simply stops updating, with nothing
+      # on screen to say why.
+      #
+      # src/ota_pubkey.h holds the key as a C string literal baked into the
+      # firmware, not a standalone .pem file, so the PEM bytes are extracted
+      # with tools/extract_pubkey_pem.py (see that file for why a small
+      # purpose-built parser, not a one-line sed, does this reliably).
+      - name: Verify the signature against the committed public key
+        run: |
+          python3 tools/extract_pubkey_pem.py src/ota_pubkey.h > /tmp/ota_pubkey.pem
+          openssl dgst -sha256 -verify /tmp/ota_pubkey.pem \
+            -signature out/manifest.sig out/manifest.txt
+          rm -f /tmp/ota_pubkey.pem
+          echo "manifest.sig verified against src/ota_pubkey.h"
+
+      # gh-pages holds only the CURRENT release (keep_files: false) -- a
+      # device fetches manifest.txt plus whichever .bin it names, so nothing
+      # is gained by keeping past releases there and it would only grow the
+      # branch forever.
+      #
+      # Pinned to the commit behind the v4.1.0 tag (resolved via the GitHub
+      # API, not typed from memory) -- the sibling project's release.yml uses
+      # the floating tag `@v4`, which is the one thing about this action's
+      # use that is NOT being copied here (see the file header).
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453  # v4.1.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./out
+          keep_files: false

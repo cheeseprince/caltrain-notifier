@@ -1,0 +1,53 @@
+# PlatformIO build output
+.pio/
+.vscode/
+
+# The 511.org API token. Never commit this — it is a per-developer credential
+# and this repo may become public. The firmware reads its token from NVS
+# (entered via the setup portal), never from a compiled-in constant; this file
+# exists only so host-side tools can talk to the API during development.
+.511-token
+
+# Compiled host-test binaries (test/*.cpp is tracked, the binaries are not)
+test/test_route
+test/test_timetable
+
+# Captured API responses may embed the token in a URL — keep raw captures local
+# and commit only the sanitised fixtures under test/fixtures/.
+tools/captures/
+
+__pycache__/
+*.pyc
+
+# Scratch artwork. This firmware draws no logo on any screen -- the code path
+# was removed rather than left switched off -- so nothing here is built into
+# anything. Ignored so that stray images cannot become an accidental commit.
+assets/
+
+# Transfer tarballs built by tools/package.sh
+dist/
+.venv-pio/
+test/test_siri_parse
+test/test_board_model
+test/test_service_day
+test/test_config
+test/test_ota_manifest
+test/test_ota_health
+test/test_ota_verify
+test/test_html_escape
+test/test_csrf_check
+test/test_wifi_pass_policy
+
+# AI dev-process exhaust. Planning directories, session notes and instruction
+# files accumulate personal detail (whose machine, whose commute, whose shell
+# habits) that has nothing to do with the firmware and everything to do with the
+# author. Keep them out of the repo, and preferably outside the directory.
+CLAUDE.md
+.claude/
+.superpowers/
+docs/superpowers/
+
+# Internal audit reports. Publishing a findings document is itself a disclosure;
+# these live outside the repository entirely.
+SECURITY-AUDIT-*
+*-release-audit.*

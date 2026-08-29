@@ -1,0 +1,131 @@
+{
+  "ServiceDelivery": {
+    "ResponseTimestamp": "2026-08-18T03:34:35Z",
+    "ProducerRef": "CT",
+    "Status": true,
+    "StopMonitoringDelivery": {
+      "version": "1.4",
+      "ResponseTimestamp": "2026-08-18T03:34:35Z",
+      "Status": true,
+      "MonitoredStopVisit": [
+        {
+          "RecordedAtTime": "2026-08-18T03:34:22Z",
+          "MonitoringRef": "70012",
+          "MonitoredVehicleJourney": {
+            "LineRef": "Local Weekday",
+            "DirectionRef": "S",
+            "FramedVehicleJourneyRef": {
+              "DataFrameRef": "2026-08-17",
+              "DatedVehicleJourneyRef": "164"
+            },
+            "PublishedLineName": "",
+            "OperatorRef": "CT",
+            "OriginRef": "70012",
+            "OriginName": "San Francisco Caltrain Station Southbound",
+            "DestinationRef": "70272",
+            "DestinationName": "Tamien Caltrain Station Southbound",
+            "Monitored": true,
+            "InCongestion": null,
+            "VehicleLocation": {
+              "Longitude": "-122.39579",
+              "Latitude": "37.776001"
+            },
+            "Bearing": null,
+            "Occupancy": null,
+            "VehicleRef": "164",
+            "MonitoredCall": {
+              "StopPointRef": "70012",
+              "StopPointName": "San Francisco Caltrain Station Southbound",
+              "VehicleLocationAtStop": "",
+              "VehicleAtStop": "",
+              "DestinationDisplay": "Tamien",
+              "AimedArrivalTime": "2026-08-18T03:55:00Z",
+              "ExpectedArrivalTime": null,
+              "AimedDepartureTime": "2026-08-18T03:55:00Z",
+              "ExpectedDepartureTime": "2026-08-18T03:55:00Z",
+              "Distances": ""
+            }
+          }
+        },
+        {
+          "RecordedAtTime": "2026-08-18T03:34:22Z",
+          "MonitoringRef": "70012",
+          "MonitoredVehicleJourney": {
+            "LineRef": "Local Weekday",
+            "DirectionRef": "S",
+            "FramedVehicleJourneyRef": {
+              "DataFrameRef": "2026-08-17",
+              "DatedVehicleJourneyRef": "166"
+            },
+            "PublishedLineName": "",
+            "OperatorRef": "CT",
+            "OriginRef": "70012",
+            "OriginName": "San Francisco Caltrain Station Southbound",
+            "DestinationRef": "70262",
+            "DestinationName": "San Jose Diridon Caltrain Station Southbound",
+            "Monitored": true,
+            "InCongestion": null,
+            "VehicleLocation": {
+              "Longitude": "-122.395691",
+              "Latitude": "37.7759018"
+            },
+            "Bearing": null,
+            "Occupancy": null,
+            "VehicleRef": "166",
+            "MonitoredCall": {
+              "StopPointRef": "70012",
+              "StopPointName": "San Francisco Caltrain Station Southbound",
+              "VehicleLocationAtStop": "",
+              "VehicleAtStop": "",
+              "DestinationDisplay": "San Jose Diridon",
+              "AimedArrivalTime": "2026-08-18T04:25:00Z",
+              "ExpectedArrivalTime": null,
+              "AimedDepartureTime": "2026-08-18T04:25:00Z",
+              "ExpectedDepartureTime": "2026-08-18T04:25:00Z",
+              "Distances": ""
+            }
+          }
+        },
+        {
+          "RecordedAtTime": "2026-08-18T03:34:22Z",
+          "MonitoringRef": "70012",
+          "MonitoredVehicleJourney": {
+            "LineRef": "Local Weekday",
+            "DirectionRef": "S",
+            "FramedVehicleJourneyRef": {
+              "DataFrameRef": "2026-08-17",
+              "DatedVehicleJourneyRef": "168"
+            },
+            "PublishedLineName": "",
+            "OperatorRef": "CT",
+            "OriginRef": "70012",
+            "OriginName": "San Francisco Caltrain Station Southbound",
+            "DestinationRef": "70272",
+            "DestinationName": "Tamien Caltrain Station Southbound",
+            "Monitored": true,
+            "InCongestion": null,
+            "VehicleLocation": {
+              "Longitude": "-122.3955",
+              "Latitude": "37.7757988"
+            },
+            "Bearing": null,
+            "Occupancy": null,
+            "VehicleRef": "168",
+            "MonitoredCall": {
+              "StopPointRef": "70012",
+              "StopPointName": "San Francisco Caltrain Station Southbound",
+              "VehicleLocationAtStop": "",
+              "VehicleAtStop": "",
+              "DestinationDisplay": "Tamien",
+              "AimedArrivalTime": "2026-08-18T04:55:00Z",
+              "ExpectedArrivalTime": null,
+              "AimedDepartureTime": "2026-08-18T04:55:00Z",
+              "ExpectedDepartureTime": "2026-08-18T04:55:00Z",
+              "Distances": ""
+            }
+          }
+        }
+      ]
+    }
+  }
+}

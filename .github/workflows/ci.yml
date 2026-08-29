@@ -1,0 +1,332 @@
+# CI for caltrain-notifier.
+#
+# The gate that matters here is the secret scan. This project's whole workflow
+# revolves around a 511 API token that must never be committed, and human review
+# is not a control: on a sibling project a real vehicle VIN survived a careful
+# review, a local guard run, and a merge, and reached a public repository.
+#
+# Every third-party action is pinned to a 40-character commit SHA, and every job
+# declares least-privilege permissions.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only by default. No job here needs to write to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned by VERSION and by CHECKSUM. Version-pinning alone does not stop a
+  # release asset being replaced after the fact, and the single most valuable
+  # thing a substituted secret scanner can do is exit 0. The digest below was
+  # taken from the release's own gitleaks_8.30.1_checksums.txt — not from the
+  # copy downloaded here, which would only enshrine a bad download.
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # Full history: a secret removed from the tip is still published.
+          fetch-depth: 0
+
+      - name: Install gitleaks (version- and checksum-pinned)
+        run: |
+          set -euo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL --retry 3 -o gitleaks.tar.gz "$url"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar xzf gitleaks.tar.gz gitleaks
+          ./gitleaks version
+
+      # ---------------------------------------------------------------------
+      # Self-test FIRST. A scan that reports "no leaks found" is only meaningful
+      # if the scanner is capable of finding one. This plants a synthetic secret
+      # in a scratch directory and requires a non-zero exit. If gitleaks is ever
+      # swapped, misconfigured, or silently no-ops, this fails before any real
+      # scan has a chance to return a comforting green.
+      # ---------------------------------------------------------------------
+      - name: Prove the gate can fail
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/gate-selftest
+          # The probe is GENERATED, never written as a literal. A hardcoded
+          # example would itself be a secret-shaped string in a tracked file:
+          # either the scanner flags it (CI red forever) or it goes on the
+          # allowlist (and then the self-test can no longer fail). Deriving it
+          # from /dev/urandom avoids both, and proves the rule matches arbitrary
+          # values rather than one memorised string.
+          hex="$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')"
+          uuid="${hex:0:8}-${hex:8:4}-${hex:12:4}-${hex:16:4}-${hex:20:12}"
+          printf 'probe = "%s"\n' "$uuid" > /tmp/gate-selftest/planted.txt
+          if ./gitleaks dir --no-banner --redact --config .gitleaks.toml /tmp/gate-selftest; then
+            echo "::error::Secret scanner did NOT detect a planted secret. The gate is not working."
+            exit 1
+          fi
+          echo "Gate verified: planted secret detected, scanner exits non-zero."
+
+      - name: Scan the working tree
+        run: ./gitleaks dir --no-banner --redact --config .gitleaks.toml .
+
+      - name: Scan the full commit history
+        run: ./gitleaks git --no-banner --redact --config .gitleaks.toml .
+
+      # ---------------------------------------------------------------------
+      # gitleaks does not scan a file named .gitleaks.toml — measured, not
+      # assumed: identical bytes are flagged under any other filename and
+      # ignored under this one. That is a blind spot exactly where illustrative
+      # examples accumulate, which is how the VIN mentioned above was published.
+      # Scanning a renamed copy removes the exemption. The config's own
+      # synthetic examples are allowlisted BY VALUE, so this step is green today
+      # and turns red the moment an un-enumerated secret-shaped string is added.
+      # ---------------------------------------------------------------------
+      - name: Scan the scanner's own config
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/cfg-under-test
+          cp .gitleaks.toml /tmp/cfg-under-test/gitleaks-config-under-test.txt
+          ./gitleaks dir --no-banner --redact --config .gitleaks.toml /tmp/cfg-under-test
+
+      # gitleaks does NOT read binary files. Measured, not assumed: a UUID
+      # placed in a PNG's tEXt chunk was missed by both `gitleaks git` and
+      # `gitleaks dir`, while the same string in a .txt was caught by both. This
+      # repository commits generated images, so the gap is closed by validating
+      # their structure -- which is also where EXIF and GPS would live.
+      #
+      # An earlier version of this gate grepped raw bytes for tEXt/iTXt/zTXt/
+      # eXIf/Exif. That is both bypassable and prone to false positives:
+      # measured, not assumed, it passes bytes appended after the IEND chunk
+      # and a UUID hidden in a private "prVt" chunk, while it can fail on a
+      # chance 4-byte match inside ordinary compressed IDAT pixel data. It also
+      # misses real metadata chunks that never contain those five strings
+      # (iCCP, pHYs, tIME, sPLT, bKGD).
+      #
+      # This walks the actual PNG chunk structure instead: allowlist IHDR/
+      # PLTE/IDAT/IEND, fail on any other chunk by name, fail on any byte
+      # trailing IEND, and fail clearly on truncation -- strictly stronger
+      # than a byte grep, and immune to its false-positive class since chunk
+      # boundaries come from the length fields, never from scanning for
+      # substrings inside pixel data. All tracked images are PNG today
+      # (`git ls-files '*.png' '*.jpg' '*.jpeg'`); a tracked JPEG fails this
+      # step loudly rather than being silently waved through unchecked.
+      - name: Assert committed images carry no metadata
+        run: |
+          set -euo pipefail
+          jpegs="$(git ls-files '*.jpg' '*.jpeg')"
+          if [ -n "$jpegs" ]; then
+            echo "::error::JPEG file(s) tracked, but this gate only structurally validates PNG: $jpegs"
+            exit 1
+          fi
+          python3 - $(git ls-files '*.png') <<'PY'
+          import struct
+          import sys
+
+          PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+          ALLOWED_CHUNKS = {b"IHDR", b"PLTE", b"IDAT", b"IEND"}
+
+
+          def check_png(path):
+              """Walk a PNG's real chunk structure. Return (ok, reason)."""
+              data = open(path, "rb").read()
+
+              if len(data) < 8 or data[:8] != PNG_SIGNATURE:
+                  return False, "does not start with the 8-byte PNG signature"
+
+              pos = 8
+              end = len(data)
+              seen_iend = False
+
+              while pos < end:
+                  if seen_iend:
+                      return False, f"{end - pos} byte(s) found after IEND chunk"
+                  if pos + 8 > end:
+                      return False, f"truncated: chunk header runs past end-of-file at offset {pos}"
+
+                  (chunk_len,) = struct.unpack(">I", data[pos:pos + 4])
+                  chunk_type = data[pos + 4:pos + 8]
+                  crc_end = pos + 8 + chunk_len + 4
+
+                  if crc_end > end:
+                      return False, (
+                          f"truncated: {chunk_type!r} chunk at offset {pos} declares length "
+                          f"{chunk_len} which runs past end-of-file"
+                      )
+                  if chunk_type not in ALLOWED_CHUNKS:
+                      return False, f"disallowed chunk {chunk_type.decode('latin1')!r} at offset {pos}"
+                  if chunk_type == b"IEND":
+                      seen_iend = True
+                  pos = crc_end
+
+              if not seen_iend:
+                  return False, "truncated: no IEND chunk found"
+              return True, "ok"
+
+
+          bad = 0
+          for f in sys.argv[1:]:
+              ok, reason = check_png(f)
+              if not ok:
+                  print(f"::error::{f} {reason}")
+                  bad = 1
+          if not bad:
+              print("All committed images are structurally clean PNGs: only IHDR/PLTE/IDAT/IEND chunks, nothing after IEND.")
+          sys.exit(bad)
+          PY
+
+      # Belt and braces: the credential file must never be tracked, whatever the
+      # scanner thinks. This reads the index, so it sees tracked files only —
+      # which is the point, since "tracked" is what gets pushed.
+      - name: Assert no credential files are tracked
+        run: |
+          set -euo pipefail
+          if git ls-files --error-unmatch .511-token >/dev/null 2>&1; then
+            echo "::error::.511-token is tracked. It must never be committed."
+            exit 1
+          fi
+          tracked_artwork="$(git ls-files | grep -E '(^|/)(assets/|logo_data\.h$)' || true)"
+          if [ -n "$tracked_artwork" ]; then
+            echo "::error::Logo artwork is tracked: $tracked_artwork"
+            exit 1
+          fi
+          # The OTA release signing key must never reach the tree: it lives
+          # only in the OTA_SIGNING_KEY Actions secret and an off-machine
+          # backup (see src/ota_pubkey.h and scripts/apply-repo-settings.sh).
+          # test/fixtures/ota/test_key.pem is deliberate and allowlisted in
+          # .gitleaks.toml -- it signs only test vectors, and
+          # tools/gen_ota_test_vectors.sh deletes it again immediately after
+          # generating the fixtures, so it is not expected to be tracked either.
+          keys="$(git ls-files | grep -E '(^|/)(ota_signing_key|.*-signing-key)\.pem$' || true)"
+          if [ -n "$keys" ]; then
+            echo "::error::a signing key is tracked: $keys"
+            exit 1
+          fi
+          echo "No credential, artwork, or signing key files tracked."
+
+  timetable-freshness:
+    name: Timetable freshness
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # FINDING F-1 (2026-08 adversarial review): the compiled schedule in
+      # src/timetable_data.h expires — serviceForDate() falls back to plain
+      # weekday/weekend once a date runs past kTimetableLastOverride, which is
+      # wrong on the next unlisted holiday. A README line saying "regenerate
+      # this" is not a control; this is. It fails while there is still time to
+      # act (a 90-day window), not on the day the data actually goes stale.
+      - name: Fail if the timetable's validity window is closing
+        run: |
+          python3 - <<'PY'
+          import datetime
+          import pathlib
+          import re
+          import sys
+
+          # Matches the 90-day rationale in the F-1 write-up: long enough that a
+          # CI failure gives a real chance to notice, fetch a new GTFS feed, and
+          # merge before the data is actually wrong on the desk.
+          WARNING_DAYS = 90
+
+          header = pathlib.Path("src/timetable_data.h").read_text()
+
+          def extract(name: str) -> int:
+              m = re.search(rf"inline constexpr uint32_t {name} = (\d+);", header)
+              if not m:
+                  print(
+                      f"::error::{name} not found in src/timetable_data.h — "
+                      "was it generated by the current tools/gen_timetable.py?"
+                  )
+                  sys.exit(1)
+              return int(m.group(1))
+
+          # Two different dates, and the EARLIER one is what actually bounds
+          # correctness: kTimetableLastOverride (the last known holiday pattern)
+          # usually runs out before kTimetableFeedEnd (the GTFS feed's own
+          # declared validity end). See timetableExpired() in src/timetable.h.
+          last_override = extract("kTimetableLastOverride")
+          feed_end = extract("kTimetableFeedEnd")
+          threshold = min(last_override, feed_end)
+
+          def to_date(yyyymmdd: int) -> datetime.date:
+              s = str(yyyymmdd)
+              return datetime.date(int(s[0:4]), int(s[4:6]), int(s[6:8]))
+
+          today = datetime.datetime.now(datetime.timezone.utc).date()
+          days_left = (to_date(threshold) - today).days
+
+          if days_left <= WARNING_DAYS:
+              print(
+                  f"::error::The compiled timetable's earlier validity bound "
+                  f"({threshold}) is only {days_left} day(s) away (warning window "
+                  f"is {WARNING_DAYS} days). Regenerate the feed and both headers: "
+                  "`python3 tools/gen_stations.py && python3 tools/gen_timetable.py`, "
+                  "then `cd test && make` to confirm, and commit the result."
+              )
+              sys.exit(1)
+
+          print(
+              f"Timetable good for {days_left} more day(s) "
+              f"(earlier bound {threshold}); {WARNING_DAYS}-day gate not yet due."
+          )
+          PY
+
+  host-tests:
+    name: Host tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # The only host-test dependency. 2.28.x matches the mbedtls the ESP32
+      # core ships, so test_ota_verify exercises the same API as the device.
+      - name: Install mbedtls
+        run: sudo apt-get update -qq && sudo apt-get install -y libmbedtls-dev
+      # Pure-logic modules only: no board, no network. Built with -Werror, and
+      # the timetable assertions run against the real compiled schedule, so a
+      # feed regeneration that drops trains fails here rather than on the desk.
+      - name: Build and run
+        run: cd test && make
+
+  device-build:
+    name: Device build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [caltrain, caltrain_v20]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      # Pinned like everything else here (platform, TFT_eSPI, ArduinoJson,
+      # gitleaks, every Action). This one matters more than mere consistency:
+      # the planned release workflow builds this same firmware, signs it, and
+      # ships it to devices over the air. An unpinned toolchain means the
+      # binary being signed is not reproducible -- "upgrade platformio" could
+      # silently change what gets built between the day it's tested and the
+      # day it's released. Pinned to the version this project has actually
+      # been built and tested with (`pip show platformio` on the dev machine).
+      - name: Install PlatformIO
+        run: pip install platformio==6.1.19
+      # Both board revisions build. They differ only in TOUCH_CS/TFT_MISO, which
+      # is exactly the kind of difference that compiles on one and not the other.
+      - name: Build ${{ matrix.environment }}
+        run: pio run -e ${{ matrix.environment }}
