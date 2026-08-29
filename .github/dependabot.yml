@@ -1,0 +1,29 @@
+# Dependabot configuration.
+#
+# github-actions: every `uses:` in every workflow is pinned to a 40-character
+# commit SHA (see ci.yml and release.yml headers for why), so nothing here
+# updates automatically without a PR to review -- this just keeps the PRs
+# coming as upstream actions cut new releases.
+#
+# pip: requirements.txt hash-pins the PlatformIO toolchain (see that file's
+# header). Dependabot can bump versions and hashes together for a pure
+# Python dependency, so it is covered too.
+#
+# PlatformIO's own ecosystem (platformio.ini: platform, board framework, and
+# every lib_deps entry) is DELIBERATELY NOT covered here. Dependabot has no
+# PlatformIO ecosystem to speak of, platformio.ini pins the platform and
+# every library exactly on purpose (see its own header comment), and a bump
+# there changes what actually gets compiled and flashed to a device -- it
+# needs a device build and a human decision, not an automated PR. Those
+# bumps are handled by hand.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
