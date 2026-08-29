@@ -77,6 +77,7 @@ if gh api -X PUT "repos/$REPO/branches/main/protection" --input - >/dev/null 2>&
     "strict": false,
     "contexts": [
       "Secret scan",
+      "Timetable freshness",
       "Host tests",
       "Device build (caltrain)",
       "Device build (caltrain_v20)"
@@ -102,6 +103,17 @@ if gh api -X POST "repos/$REPO/rulesets" --input - >/dev/null 2>&1 <<'JSON'
 }
 JSON
 then echo "   applied"; else echo "   SKIPPED - needs a public repository, or already exists"; fi
+
+echo "== actions: require SHA-pinned action references =="
+# Every action in .github/workflows/ is already pinned to a 40-char commit SHA
+# by hand. This makes GitHub enforce it, so a future workflow that reaches for a
+# floating tag is refused rather than merged and noticed later -- the sibling
+# obd-gauge-cluster repo has exactly that floating-tag pattern in its release
+# job, which is what prompted checking here.
+gh api -X PUT "repos/$REPO/actions/permissions" --input - <<'JSON' >/dev/null 2>&1 \
+  && echo "   enforced" || echo "   SKIPPED - needs a public repository"
+{"enabled": true, "allowed_actions": "all", "sha_pinning_required": true}
+JSON
 
 echo "== GitHub Pages (OTA release channel) =="
 # The gh-pages branch (published by release.yml / tools/publish_ota.sh) serves
