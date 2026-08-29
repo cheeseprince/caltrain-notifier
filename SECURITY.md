@@ -8,7 +8,13 @@ it to catch a train you cannot afford to miss.**
 ## Reporting a vulnerability
 
 Please **do not open a public issue** for a security problem. Use GitHub's
-private reporting instead: the **Security** tab → **Report a vulnerability**.
+private vulnerability reporting instead, which is enabled on this repository:
+
+**[Report a vulnerability](https://github.com/cheeseprince/caltrain-notifier/security/advisories/new)**
+(the same form is linked from the repo's **Security** tab → **Report a
+vulnerability**). See GitHub's own docs on
+[privately reporting a security vulnerability](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability)
+if you want to know what that form does with your report before using it.
 
 That routes it privately to the maintainer. Include what the issue is, how to
 reproduce it, and the impact you see. There is no formal SLA on a hobby project,
