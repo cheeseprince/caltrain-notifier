@@ -81,7 +81,7 @@ jobs:
     needs: prove-gate
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # only this job pushes (to gh-pages, via GITHUB_TOKEN)
+      contents: write   # only this job pushes (to gh-pages) and creates the tag's GitHub Release, both via GITHUB_TOKEN
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -93,9 +93,13 @@ jobs:
 
       # Same pin ci.yml's device-build job uses. This build is the one being
       # signed and shipped over the air, so its toolchain must be exactly
-      # reproducible -- see the header comment above.
+      # reproducible -- see the header comment above. Hash-pinned via
+      # requirements.txt: --require-hashes refuses anything that does not
+      # match the sha256 set pinned there, which matters more here than
+      # anywhere else in this repo since this is the build that gets
+      # cryptographically signed and shipped to devices.
       - name: Install PlatformIO
-        run: pip install platformio==6.1.19
+        run: pip install --require-hashes -r requirements.txt
 
       - name: Stamp the firmware version
         run: |
@@ -190,3 +194,28 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./out
           keep_files: false
+
+      # Everything above is genuinely published the moment it lands on
+      # gh-pages, but only someone who already knows this project uses
+      # gh-pages as its OTA channel can find it there. A GitHub Release
+      # makes the same four signed artifacts discoverable from the repo's
+      # own Releases tab -- including for the README's USB recovery path
+      # (`./tools/mac_flash.sh firmware`), which today just says "download
+      # caltrain.bin" with no stable link to send anyone to.
+      #
+      # Tag pushes only: workflow_dispatch runs this same job to produce a
+      # dev-<hash> build with no tag behind it, and `gh release create` has
+      # nothing to attach a release to in that case.
+      - name: Create the GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NOTES=$(printf '%s\n\n%s\n\n%s\n' \
+            "Firmware $VERSION for both board revisions (\`caltrain\` = board v2.2, \`caltrain_v20\` = board v2.0)." \
+            "\`manifest.txt\` carries a detached ECDSA-P256/SHA-256 signature (\`manifest.sig\`), verified against the public key compiled into the firmware (\`src/ota_pubkey.h\`) before a device reads a single field of the manifest. There is no unsigned fallback: an absent, malformed, or invalid signature is refused outright -- see SECURITY.md." \
+            "These are the same four files just published to the \`gh-pages\` branch that devices fetch automatically during their daily OTA check. This Release exists so they can also be found without knowing \`gh-pages\` is the update channel.")
+          gh release create "$GITHUB_REF_NAME" \
+            out/manifest.txt out/manifest.sig out/caltrain.bin out/caltrain_v20.bin \
+            --title "$VERSION" \
+            --notes "$NOTES"
