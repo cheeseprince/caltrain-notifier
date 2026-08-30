@@ -418,6 +418,9 @@ see `SECURITY.md` for the full trust model.
 
 ## Development
 
+Bug reports, vulnerability reports and pull requests: see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ### Host tests
 
 Pure logic — station lookup, direction, schedule queries, JSON parsing, the
