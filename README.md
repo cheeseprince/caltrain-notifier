@@ -1,9 +1,7 @@
 # Caltrain Notifier
 
 [![CI](https://github.com/cheeseprince/caltrain-notifier/actions/workflows/ci.yml/badge.svg)](https://github.com/cheeseprince/caltrain-notifier/actions/workflows/ci.yml)
-[![Release](https://github.com/cheeseprince/caltrain-notifier/actions/workflows/release.yml/badge.svg)](https://github.com/cheeseprince/caltrain-notifier/actions/workflows/release.yml)
 [![Firmware](https://img.shields.io/github/v/tag/cheeseprince/caltrain-notifier?label=firmware&color=0b7285)](https://cheeseprince.github.io/caltrain-notifier/manifest.txt)
-[![OTA: signed](https://img.shields.io/badge/OTA-signed%20ECDSA--P256-0b7285)](#over-the-air-updates)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cheeseprince/caltrain-notifier/badge)](https://scorecard.dev/viewer/?uri=github.com/cheeseprince/caltrain-notifier)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Claude](https://img.shields.io/badge/Claude-D97757?logo=claude&logoColor=fff)](#ai-assistance)
