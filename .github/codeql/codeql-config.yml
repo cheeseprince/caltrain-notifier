@@ -1,0 +1,13 @@
+# CodeQL config for caltrain-notifier.
+#
+# The only thing this file does is exclude third_party/ArduinoJson.h from
+# analysis. That file is a 244 KB vendored single-header library (ArduinoJson
+# v7.1.0, see third_party/ArduinoJson-LICENSE.txt) -- it is not code this repo
+# wrote or can patch, so findings inside it are not actionable here and would
+# only bury the findings in code we actually own. Nothing else is excluded:
+# every first-party .cpp/.h under src/ is in scope for both build modes used
+# by .github/workflows/codeql.yml.
+name: "caltrain-notifier CodeQL config"
+
+paths-ignore:
+  - third_party/ArduinoJson.h

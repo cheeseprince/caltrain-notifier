@@ -1,0 +1,133 @@
+# CodeQL static analysis (SAST) for caltrain-notifier.
+#
+# WHY THIS EXISTS. This is C++ parsing untrusted bytes off a network API
+# (siri_parse.cpp, over HTTP from 511.org) and verifying cryptographic
+# signatures on a firmware image before flashing it (ota_verify.cpp,
+# ota_task.cpp) -- exactly the class of code where a static analyzer earns
+# its keep independent of any score. OpenSSF Scorecard's SAST check also
+# reports 0/10 ("no SAST tool detected") without this.
+#
+# Every third-party action is pinned to a 40-character commit SHA, matching
+# ci.yml's, release.yml's, and scorecard.yml's convention -- resolved live
+# from the GitHub API (git ref/tag object -> commit SHA), not typed from
+# memory. This repo has `sha_pinning_required` enforced, so an unpinned
+# reference is rejected at push time, not merely scored down.
+#
+# TWO BUILD MODES, NOT ONE. CodeQL needs to observe an actual build to
+# extract a C/C++ database -- it cannot analyze headers or untraced sources.
+# There are two builds in this repo, and both are wired up here because they
+# see different code:
+#
+#   1. `device-build` -- the real firmware, cross-compiled for the ESP32 by
+#      xtensa-esp32-elf-g++ (a GCC build, just retargeted). CodeQL's build
+#      tracer hooks compiler invocations regardless of target triple, so this
+#      works and is confirmed by the run this workflow produced: it compiles
+#      every .cpp under src/ (verified locally via the .o files PlatformIO
+#      emits under .pio/build/caltrain/src/), all 3,714 lines. THIS IS THE
+#      MEANINGFUL COVERAGE NUMBER -- it includes ota_task.cpp (the OTA
+#      download/install worker) and render.cpp, neither of which the host
+#      build below touches.
+#
+#   2. `host-tests` -- `cd test && make`, plain host g++, no board. Measured
+#      coverage: 981 of 3,714 lines (26%) -- siri_parse.cpp, ota_verify.cpp,
+#      ota_manifest.cpp, ota_health.cpp, board_model.cpp, config.cpp,
+#      route.cpp, service_day.cpp, timetable.cpp. That is a minority of the
+#      codebase by line count, but it is compiled with different #ifdef
+#      branches active than the device build (the non-ARDUINO host-test seam;
+#      see test/Makefile) and mbedtls linked in directly for ota_verify.cpp,
+#      so it is not pure duplicate coverage of job 1 -- it is kept as a
+#      second, independently-built view of the same security-critical files
+#      even though the device build already reaches them.
+#
+# Each job uploads under its own `category` (see the analyze step) so the
+# Security tab keeps both result sets distinct instead of one overwriting
+# the other.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, same cadence as scorecard.yml, offset off the hour and off
+    # scorecard's own Saturday slot so the two don't contend for runners.
+    - cron: '14 7 * * 3'
+
+# Read-only by default, like every other workflow here. Each job below
+# elevates only to what its own steps need.
+permissions:
+  contents: read
+
+jobs:
+  device-build:
+    name: CodeQL (device build, xtensa-esp32-elf-g++, full src/ coverage)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Needed by the analyze step to upload SARIF to this repo's
+      # code-scanning dashboard.
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+
+      # Hash-pinned, same as device-build in ci.yml -- see requirements.txt's
+      # own header for why version-pinning PlatformIO alone is not enough.
+      - name: Install PlatformIO
+        run: pip install --require-hashes -r requirements.txt
+
+      # build-mode: manual means CodeQL does not try to guess a build command
+      # (autobuild does not know PlatformIO) -- it instead wraps whatever
+      # runs between this step and the "Analyze" step below in its build
+      # tracer, watching for compiler invocations.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
+        with:
+          languages: c-cpp
+          build-mode: manual
+          config-file: ./.github/codeql/codeql-config.yml
+
+      # The real firmware build. Only one environment is built (not the
+      # caltrain_v20 counterpart from ci.yml): the two environments differ
+      # only in two pin definitions (TFT_MISO/TOUCH_CS), so they compile the
+      # same source lines and would not add coverage, only CI time.
+      - name: Build firmware (caltrain environment)
+        run: pio run -e caltrain
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
+        with:
+          category: "device-build"
+
+  host-tests:
+    name: CodeQL (host test build, g++, partial coverage -- see comments above)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # Same dependency host-tests in ci.yml needs: test_ota_verify links
+      # against mbedtls to exercise the same signature-verification API the
+      # device runs.
+      - name: Install mbedtls
+        run: sudo apt-get update -qq && sudo apt-get install -y libmbedtls-dev
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
+        with:
+          languages: c-cpp
+          build-mode: manual
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Build and run host tests
+        run: cd test && make
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9
+        with:
+          category: "host-tests"
