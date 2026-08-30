@@ -99,4 +99,39 @@ $(BIN_WPASS): $(SRC_WPASS) ../src/wifi_pass_policy.h
 clean:
 	rm -f $(BINS)
 
-.PHONY: all clean
+# --- Fuzzing ----------------------------------------------------------------
+# libFuzzer + AddressSanitizer + UndefinedBehaviorSanitizer target for
+# siri_parse.cpp -- the only code in this project that parses bytes from
+# outside (the 511 SIRI API, over HTTPS). Deliberately kept out of `all`
+# above and out of CXX/CXXFLAGS: `make` must stay plain-g++ with no clang
+# dependency for anyone who just wants to run the host suite.
+#
+#   make fuzz        build fuzz/fuzz_siri_parse
+#   make fuzz-run     build it and fuzz for FUZZ_SECONDS (default 60) against
+#                     a corpus seeded from the real captured fixture plus the
+#                     hand-made seeds in fuzz/seeds/
+#   make fuzz-clean   remove the fuzz binary and the grown corpus
+FUZZ_CXX      ?= clang++
+FUZZ_CXXFLAGS ?= -std=c++17 -Wall -Wextra -I../src -I../third_party -g -O1 \
+                 -fsanitize=fuzzer,address,undefined
+
+BIN_FUZZ = fuzz/fuzz_siri_parse
+SRC_FUZZ = fuzz/fuzz_siri_parse.cpp ../src/siri_parse.cpp
+
+fuzz: $(BIN_FUZZ)
+
+$(BIN_FUZZ): $(SRC_FUZZ) ../src/siri_parse.h
+	$(FUZZ_CXX) $(FUZZ_CXXFLAGS) $(SRC_FUZZ) -o $(BIN_FUZZ)
+
+FUZZ_SECONDS ?= 60
+fuzz-run: $(BIN_FUZZ)
+	mkdir -p fuzz/corpus
+	cp -n fuzz/seeds/* fuzz/corpus/ 2>/dev/null || true
+	cp -n fixtures/stopmonitoring_70012.json fuzz/corpus/ 2>/dev/null || true
+	./$(BIN_FUZZ) -max_total_time=$(FUZZ_SECONDS) -artifact_prefix=fuzz/corpus/ fuzz/corpus
+
+fuzz-clean:
+	rm -f $(BIN_FUZZ)
+	rm -rf fuzz/corpus
+
+.PHONY: all clean fuzz fuzz-run fuzz-clean

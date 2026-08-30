@@ -38,6 +38,11 @@ test/test_html_escape
 test/test_csrf_check
 test/test_wifi_pass_policy
 
+# Fuzzer build output and grown corpus (crash-*, oom-*, timeout-* artifacts
+# land here too). fuzz/seeds/ is hand-curated and stays tracked.
+test/fuzz/fuzz_siri_parse
+test/fuzz/corpus/
+
 # AI dev-process exhaust. Planning directories, session notes and instruction
 # files accumulate personal detail (whose machine, whose commute, whose shell
 # habits) that has nothing to do with the firmware and everything to do with the

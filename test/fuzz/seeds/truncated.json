@@ -1,0 +1,14 @@
+{
+  "ServiceDelivery": {
+    "ResponseTimestamp": "2026-08-18T03:34:35Z",
+    "ProducerRef": "CT",
+    "Status": true,
+    "StopMonitoringDelivery": {
+      "version": "1.4",
+      "ResponseTimestamp": "2026-08-18T03:34:35Z",
+      "Status": true,
+      "MonitoredStopVisit": [
+        {
+          "RecordedAtTime": "2026-08-18T03:34:22Z",
+          "MonitoringRef": "70012",
+          "MonitoredVehi
