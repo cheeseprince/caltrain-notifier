@@ -80,7 +80,8 @@ if gh api -X PUT "repos/$REPO/branches/main/protection" --input - >/dev/null 2>&
       "Timetable freshness",
       "Host tests",
       "Device build (caltrain)",
-      "Device build (caltrain_v20)"
+      "Device build (caltrain_v20)",
+      "Fuzz smoke test (siri_parse, ~90s, not a fuzzing campaign)"
     ]
   },
   "enforce_admins": false,
