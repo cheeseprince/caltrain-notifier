@@ -27,3 +27,30 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Four of PlatformIO's transitive dependencies cannot be bumped
+    # independently: platformio 6.1.19 declares starlette<0.53, uvicorn<0.41,
+    # click<8.4 and marshmallow==3.*, so a newer version leaves pip reporting an
+    # inconsistent environment. Measured: the firmware still builds either way,
+    # but `pip check` fails and PlatformIO's own `pio home` is the untested
+    # casualty.
+    #
+    # This is not resolvable here -- it resolves upstream. PlatformIO's develop
+    # branch (6.2.0b2) already widens three of the four to starlette<2,
+    # uvicorn<1 and click<8.6; see platformio-core PR #5423, "fix: usage with
+    # starlette >= 1". That fix is merged but unreleased: 6.1.19 (Feb 2026) is
+    # still the newest release on PyPI and there are no pre-releases.
+    #
+    # So these are ignored until PlatformIO 6.2 ships, at which point the fix is
+    # to bump platformio itself and regenerate requirements.txt -- not to bump
+    # these four. marshmallow is the exception: develop still says `== 3.*`, so
+    # 4.x stays out of bounds regardless.
+    #
+    # Ignoring version-update PRs does NOT hide the vulnerabilities. Dependabot
+    # security alerts come from the dependency graph, not from this file, so the
+    # five starlette advisories stay visible in the Security tab. They are
+    # documented in requirements.txt with why they cannot be fixed downstream.
+    ignore:
+      - dependency-name: "starlette"
+      - dependency-name: "uvicorn"
+      - dependency-name: "click"
+      - dependency-name: "marshmallow"
