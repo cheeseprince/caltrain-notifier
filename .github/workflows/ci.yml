@@ -335,3 +335,62 @@ jobs:
       # is exactly the kind of difference that compiles on one and not the other.
       - name: Build ${{ matrix.environment }}
         run: pio run -e ${{ matrix.environment }}
+
+  fuzz-smoke:
+    # NAME AND SCOPE, STATED PLAINLY: this is a bounded SMOKE TEST, not a
+    # fuzzing campaign. It runs the libFuzzer target in test/fuzz/ for about
+    # ninety seconds on every push so a REGRESSION in siri_parse.cpp -- the
+    # only code in this project that parses bytes from outside -- surfaces
+    # quickly. It is not a substitute for continuous fuzzing (OSS-Fuzz,
+    # ClusterFuzzLite) and does not claim to be one; see the fuzz report for
+    # what a short local/CI run can and cannot be expected to find.
+    name: Fuzz smoke test (siri_parse, ~90s, not a fuzzing campaign)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # EXPECTED TO FAIL RIGHT NOW, ON PURPOSE. Fuzzing found a real,
+    # already-reported gap: parseIso8601Utc range-checks month/day/hour/
+    # minute/second but not the year, so a single corrupted year digit in an
+    # otherwise well-formed timestamp (e.g. "2227" instead of "2026") is
+    # silently accepted -- the same "confidently wrong departure" shape as
+    # the timezone bug fixed alongside this fuzzer. Per the fuzz report, that
+    # finding is deliberately NOT fixed here, and the invariant that catches
+    # it is deliberately NOT weakened just to make this job pass. Marking the
+    # job continue-on-error keeps the failure visible on every run -- it is
+    # not a flake, and it is not hidden -- without blocking merges on an
+    # issue that already has its own tracked finding awaiting review.
+    # REMOVE continue-on-error once that finding is fixed.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # clang, not gcc: the fuzz target needs -fsanitize=fuzzer,address,undefined,
+      # which the host-tests' plain g++ build deliberately does not depend on
+      # (see test/Makefile's `fuzz` target comment). libclang-rt-dev carries
+      # the sanitizer and libFuzzer runtime archives that the bare `clang`
+      # package does not pull in on its own.
+      - name: Install clang and sanitizer runtimes
+        run: sudo apt-get update -qq && sudo apt-get install -y clang libclang-rt-dev
+
+      - name: Build the fuzz target
+        run: cd test && make fuzz
+
+      # Hard-timeout wrapper as a backstop: a crash triggers ASan/UBSan's own
+      # report-and-exit path, but this makes sure a slow or wedged symbolizer
+      # cannot turn a 90-second smoke test into a hung job -- it fails fast
+      # and loud instead.
+      - name: Fuzz for a bounded smoke window
+        run: |
+          cd test
+          timeout --kill-after=15s 150s make fuzz-run FUZZ_SECONDS=90
+
+      # Uploaded even on failure -- a crashing/invariant-violating input is
+      # exactly the thing worth pulling down and re-running locally.
+      - name: Upload corpus and any crashing inputs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: fuzz-smoke-corpus
+          path: test/fuzz/corpus/
+          retention-days: 14
+          if-no-files-found: ignore
