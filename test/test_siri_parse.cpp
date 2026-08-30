@@ -40,7 +40,12 @@ int main() {
   // --- ISO-8601 ------------------------------------------------------------
   // Values cross-checked against `date -u -d '<stamp>' +%s`, not derived by hand.
   check(parseIso8601Utc("2026-08-08T18:00:00Z") == 1786212000, "UTC instant");
-  check(parseIso8601Utc("1970-01-01T00:00:00Z") == 0, "the epoch itself");
+  // 1970-01-01 now hits the year-bound check below (added after fuzzing found
+  // the year was unbounded) and is refused for being outside 2000-2100 --
+  // still 0, but for a different reason than "this is genuinely epoch zero".
+  // Kept here, reworded, rather than deleted, so the case is not silently
+  // dropped by a future refactor.
+  check(parseIso8601Utc("1970-01-01T00:00:00Z") == 0, "pre-2000 epoch itself is now refused, not computed");
   check(parseIso8601Utc("2026-01-01T00:00:00Z") == 1767225600, "new year 2026");
 
   // An explicit offset must be converted, not ignored. The stoptimetable
@@ -90,6 +95,23 @@ int main() {
   // The minutes component of an offset is still a minutes value: 0-59, same
   // as the minutes-of-the-hour checked earlier in the function.
   check(parseIso8601Utc("2026-08-29T12:00:00+05:75") == 0, "offset minutes 75 -> 0");
+
+  // Year validation. Fuzzing (test/fuzz/fuzz_siri_parse.cpp) found that year
+  // was the one date/time field left unbounded: "0001" produced a huge
+  // negative epoch that board_model.cpp turned into a phantom RED "departing
+  // now" row, and "2227" produced a meaningless far-future GREEN one. Both
+  // are syntactically valid ISO-8601 and were silently accepted before this
+  // guard existed.
+  check(parseIso8601Utc("0001-01-01T00:00:00Z") == 0, "year 0001 -> 0, not a phantom negative epoch");
+  check(parseIso8601Utc("2227-08-18T04:55:00Z") == 0, "year 2227 -> 0, not a meaningless far-future epoch");
+
+  // Boundaries: 2000 and 2100 are the edges of the accepted window and must
+  // still parse; one year past either edge must be refused, not clamped --
+  // the same pattern already used for the UTC-offset boundaries above.
+  check(parseIso8601Utc("2000-01-01T00:00:00Z") == 946684800, "year 2000 is the minimum accepted year");
+  check(parseIso8601Utc("2100-01-01T00:00:00Z") == 4102444800, "year 2100 is the maximum accepted year");
+  check(parseIso8601Utc("1999-12-31T23:59:59Z") == 0, "year 1999 is one year below the minimum -> 0");
+  check(parseIso8601Utc("2101-01-01T00:00:00Z") == 0, "year 2101 is one year above the maximum -> 0");
 
   // Existing valid offsets from before this fix must still work unchanged.
   check(parseIso8601Utc("2026-08-08T11:00:00-07:00") == parseIso8601Utc("2026-08-08T18:00:00Z"),

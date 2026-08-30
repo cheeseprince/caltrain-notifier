@@ -53,6 +53,20 @@ int64_t parseIso8601Utc(const char* s) {
   if (!readInt(p, 2, min) || *p++ != ':') return 0;
   if (!readInt(p, 2, sec)) return 0;
 
+  // Fuzzing found that this function bounded every field EXCEPT year, so a
+  // single corrupted digit (e.g. "0001" or "2227" in place of "2026") was
+  // silently accepted and produced a departure with a wildly wrong epoch --
+  // one that board_model.cpp then renders as either an oldest-possible
+  // "departing right now" (RED, most urgent state on the board) or a
+  // meaningless far-future one, depending on which way the corruption went.
+  // That is exactly the "confidently wrong is worse than no board at all"
+  // failure this project refuses elsewhere. A plain absolute window, not
+  // derived from the compiled timetable or the current clock: this function
+  // has no access to "now" and must stay pure and host-testable, and a
+  // Caltrain departure board has no legitimate use for a year before this
+  // system could exist or a century past it. 2000-2100 comfortably brackets
+  // any real SIRI response without needing runtime state.
+  if (year < 2000 || year > 2100) return 0;
   if (mon < 1 || mon > 12 || day < 1 || day > 31) return 0;
   if (hour > 23 || min > 59 || sec > 60) return 0;  // 60 allows a leap second
 
