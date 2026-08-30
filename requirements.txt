@@ -12,6 +12,23 @@
 # unverified build toolchain would undermine the reproducibility of a signed
 # artifact.
 #
+# KNOWN, ACCEPTED: starlette 0.52.1 carries five OSV advisories (PYSEC-2026-161,
+# -248, -249, -2280, -2281), all fixed in starlette 1.0.1 or later. They CANNOT
+# be resolved here: platformio 6.1.19 declares `starlette<0.53,>=0.19`, so any
+# fixed version violates its own constraint. Upgrading needs PlatformIO to
+# relax that bound upstream.
+#
+# Pinning did not introduce these. `pip install platformio==6.1.19` has always
+# pulled starlette 0.52.x transitively; writing the tree down is what made them
+# visible to scanners. Scorecard's Vulnerabilities check consequently went from
+# 10/10 to 5/10 when this file was added -- a drop caused by transparency, not
+# by a change in exposure. Deleting this file to recover those points would be
+# hiding a known issue, so it stays.
+#
+# Actual exposure in CI is nil: starlette backs PlatformIO's `pio home` web UI,
+# which neither workflow invokes -- they run `pio run` only. Re-check whenever
+# PlatformIO is bumped; if a later release widens the starlette bound, take it.
+#
 # HOW TO REGENERATE. Bump the version in the one-line source file and rerun
 # pip-compile -- do not hand-edit hashes:
 #
