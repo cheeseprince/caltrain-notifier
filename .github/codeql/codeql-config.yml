@@ -22,4 +22,4 @@ name: "caltrain-notifier CodeQL config"
 
 paths-ignore:
   - third_party/ArduinoJson.h
-  - .pio/
+  - .pio/**
