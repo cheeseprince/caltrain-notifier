@@ -69,6 +69,35 @@ int main() {
   check(parseIso8601Utc("2026-08-08T18:00:00.500Z") == parseIso8601Utc("2026-08-08T18:00:00Z"),
         "fractional seconds are ignored, not fatal");
 
+  // Offset validation. Found by direct test: an out-of-range offset was
+  // ACCEPTED and silently applied, shifting a departure by up to ~100 hours
+  // while still returning a non-zero (looks-valid) epoch -- a confidently
+  // wrong departure board, worse than refusing outright.
+  check(parseIso8601Utc("2026-08-29T12:00:00+99:99") == 0, "nonsense offset +99:99 -> 0");
+  check(parseIso8601Utc("2026-08-29T12:00:00+45:00") == 0, "out-of-range offset +45:00 -> 0");
+
+  // Boundaries: -12:00 (Baker Island) and +14:00 (Line Islands) are real,
+  // in-use UTC offsets and must still be accepted.
+  check(parseIso8601Utc("2026-08-29T12:00:00-12:00") == parseIso8601Utc("2026-08-30T00:00:00Z"),
+        "-12:00 is the most negative real offset and is accepted");
+  check(parseIso8601Utc("2026-08-29T12:00:00+14:00") == parseIso8601Utc("2026-08-28T22:00:00Z"),
+        "+14:00 is the most positive real offset and is accepted");
+
+  // One minute past either boundary is refused, not clamped.
+  check(parseIso8601Utc("2026-08-29T12:00:00+14:01") == 0, "+14:01 is one minute past the max -> 0");
+  check(parseIso8601Utc("2026-08-29T12:00:00-12:01") == 0, "-12:01 is one minute past the min -> 0");
+
+  // The minutes component of an offset is still a minutes value: 0-59, same
+  // as the minutes-of-the-hour checked earlier in the function.
+  check(parseIso8601Utc("2026-08-29T12:00:00+05:75") == 0, "offset minutes 75 -> 0");
+
+  // Existing valid offsets from before this fix must still work unchanged.
+  check(parseIso8601Utc("2026-08-08T11:00:00-07:00") == parseIso8601Utc("2026-08-08T18:00:00Z"),
+        "-07:00 still accepted after adding offset validation");
+  check(parseIso8601Utc("2026-08-08T19:00:00+01:00") == parseIso8601Utc("2026-08-08T18:00:00Z"),
+        "+01:00 still accepted after adding offset validation");
+  check(parseIso8601Utc("2026-08-08T18:00:00Z") == 1786212000, "Z form unaffected by offset validation");
+
   // --- The real captured response -------------------------------------------
   const std::string live = slurp("fixtures/stopmonitoring_70012.json");
   check(!live.empty(), "fixture loads");

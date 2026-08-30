@@ -73,6 +73,19 @@ int64_t parseIso8601Utc(const char* s) {
     if (!readInt(p, 2, oh)) return 0;
     if (*p == ':') p++;
     if (!readInt(p, 2, om)) return 0;
+
+    // readInt bounds oh and om to 0-99 each (two digits), but that leaves
+    // "+99:99" and "+45:00" both ACCEPTED and silently shifting a departure
+    // by up to ~100 hours -- a wrong-but-plausible board, which is worse than
+    // refusing outright. Real UTC offsets run from -12:00 (Baker Island) to
+    // +14:00 (Kiribati's Line Islands), and minutes are always 0-59, so
+    // refuse anything outside that -- the same "refuse rather than guess"
+    // rule already applied to hour/min/sec above.
+    if (om > 59) return 0;
+    const int totalMinutes = oh * 60 + om;
+    if (totalMinutes > 14 * 60) return 0;
+    if (sign < 0 && totalMinutes > 12 * 60) return 0;
+
     return epoch - sign * (oh * 3600 + om * 60);
   }
   return 0;  // some zone format we do not understand: refuse rather than guess
