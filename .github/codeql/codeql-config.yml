@@ -9,15 +9,29 @@
 #   .pio/  PlatformIO's build cache, including downloaded library sources
 #     such as TFT_eSPI. It should never have been in CodeQL's scope in the
 #     first place -- it is a build artefact, fetched fresh by `pio run`, not
-#     part of this repository. Two cpp/comparison-with-wider-type alerts were
-#     found inside .pio/libdeps/caltrain/TFT_eSPI/Extensions/Sprite.cpp before
-#     this exclusion; both are removed by it, not fixed, because there is
-#     nothing here to fix.
+#     part of this repository.
 #
-# Findings inside either would not be actionable here and would only bury the
-# findings in code we actually own. Nothing else is excluded: every
-# first-party .cpp/.h under src/ is in scope for both build modes used by
-# .github/workflows/codeql.yml.
+# WHAT THIS ENTRY DOES NOT DO, measured rather than assumed: two
+# cpp/comparison-with-wider-type alerts live in
+# .pio/libdeps/caltrain/TFT_eSPI/Extensions/Sprite.cpp, found by the
+# device-build job (.github/workflows/codeql.yml), which runs `pio run` --
+# a traced, compiled build. Adding .pio/** here does NOT remove them: verified
+# across two live CodeQL runs (both a bare ".pio/" entry and this "**" form),
+# the alerts persisted unchanged, still attributed to that path, on both. Per
+# GitHub's own code-scanning docs, paths-ignore filters analysis "where code
+# is [not] built" -- for a language extracted by tracing an actual build
+# (build-mode: manual/autobuild, our device-build job), it does not affect
+# what is compiled or what results come out of it; only changing what the
+# traced build itself compiles would. The entry is left in place because it
+# is still correct and harmless (it would matter for any future build-less
+# scan of this repo), but it should NOT be read as having closed those two
+# alerts -- it has not. They remain open, attributable to a vendored
+# dependency this repo cannot patch, not to first-party code.
+#
+# Findings inside either excluded path would not be actionable here and would
+# only bury the findings in code we actually own. Nothing else is excluded:
+# every first-party .cpp/.h under src/ is in scope for both build modes used
+# by .github/workflows/codeql.yml.
 name: "caltrain-notifier CodeQL config"
 
 paths-ignore:
