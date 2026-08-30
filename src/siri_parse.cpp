@@ -86,7 +86,15 @@ int64_t parseIso8601Utc(const char* s) {
     if (totalMinutes > 14 * 60) return 0;
     if (sign < 0 && totalMinutes > 12 * 60) return 0;
 
-    return epoch - sign * (oh * 3600 + om * 60);
+    // oh and om are bounded to 0-99 each by readInt's two-digit read, and
+    // tighter still to 0-14 and 0-59 by the checks just above -- nowhere
+    // near enough to overflow int, let alone int64_t. CodeQL's
+    // cpp/integer-multiplication-cast-to-long cannot see that bound, so it
+    // flags this as int arithmetic later widened to int64_t at the
+    // subtraction. Writing it with an LL suffix makes the arithmetic
+    // honestly 64-bit rather than suppressing the warning over a pattern
+    // that no longer exists.
+    return epoch - sign * (oh * 3600LL + om * 60LL);
   }
   return 0;  // some zone format we do not understand: refuse rather than guess
 }

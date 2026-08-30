@@ -1,13 +1,25 @@
 # CodeQL config for caltrain-notifier.
 #
-# The only thing this file does is exclude third_party/ArduinoJson.h from
-# analysis. That file is a 244 KB vendored single-header library (ArduinoJson
-# v7.1.0, see third_party/ArduinoJson-LICENSE.txt) -- it is not code this repo
-# wrote or can patch, so findings inside it are not actionable here and would
-# only bury the findings in code we actually own. Nothing else is excluded:
-# every first-party .cpp/.h under src/ is in scope for both build modes used
-# by .github/workflows/codeql.yml.
+# This file excludes two things from analysis, neither of which is code this
+# repo wrote or can patch:
+#
+#   third_party/ArduinoJson.h  a 244 KB vendored single-header library
+#     (ArduinoJson v7.1.0, see third_party/ArduinoJson-LICENSE.txt).
+#
+#   .pio/  PlatformIO's build cache, including downloaded library sources
+#     such as TFT_eSPI. It should never have been in CodeQL's scope in the
+#     first place -- it is a build artefact, fetched fresh by `pio run`, not
+#     part of this repository. Two cpp/comparison-with-wider-type alerts were
+#     found inside .pio/libdeps/caltrain/TFT_eSPI/Extensions/Sprite.cpp before
+#     this exclusion; both are removed by it, not fixed, because there is
+#     nothing here to fix.
+#
+# Findings inside either would not be actionable here and would only bury the
+# findings in code we actually own. Nothing else is excluded: every
+# first-party .cpp/.h under src/ is in scope for both build modes used by
+# .github/workflows/codeql.yml.
 name: "caltrain-notifier CodeQL config"
 
 paths-ignore:
   - third_party/ArduinoJson.h
+  - .pio/
