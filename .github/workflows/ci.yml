@@ -348,19 +348,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # EXPECTED TO FAIL RIGHT NOW, ON PURPOSE. Fuzzing found a real,
-    # already-reported gap: parseIso8601Utc range-checks month/day/hour/
-    # minute/second but not the year, so a single corrupted year digit in an
-    # otherwise well-formed timestamp (e.g. "2227" instead of "2026") is
-    # silently accepted -- the same "confidently wrong departure" shape as
-    # the timezone bug fixed alongside this fuzzer. Per the fuzz report, that
-    # finding is deliberately NOT fixed here, and the invariant that catches
-    # it is deliberately NOT weakened just to make this job pass. Marking the
-    # job continue-on-error keeps the failure visible on every run -- it is
-    # not a flake, and it is not hidden -- without blocking merges on an
-    # issue that already has its own tracked finding awaiting review.
-    # REMOVE continue-on-error once that finding is fixed.
-    continue-on-error: true
+    # This job WAS continue-on-error while parseIso8601Utc's missing year
+    # bound (found by this same fuzzer) was still open -- a known, reported,
+    # not-yet-fixed defect that this job reliably rediscovered on every run.
+    # Now that the year bound is fixed (see the fuzz report), this job is
+    # expected to pass on its own merits like any other CI gate, and a red
+    # run here means a genuine regression, not an accepted known issue.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
