@@ -25,3 +25,33 @@ Str resolveWifiPassword(const Str& storedSsid, const Str& submittedSsid,
   if (storedSsid == submittedSsid && submittedPass.length() == 0) return storedPass;
   return submittedPass;
 }
+
+// Which <option> the WiFi dropdown should default to when the setup page
+// loads.
+//
+// Without this, an unmarked <select> defaults to whichever network is FIRST
+// in scan order -- not necessarily the one already configured. A user who
+// opens the portal only to change an unrelated setting (brightness, the
+// urgency timers) and saves without touching this field then silently
+// overwrites the WiFi configuration with whatever the radio happened to list
+// first, and -- because resolveWifiPassword() above reads a changed SSID as
+// "this network is open" -- wipes the stored password at the same time.
+template <class Str>
+struct SsidDefault {
+  int matchIndex;       // index into `scanned` to mark selected, or -1
+  bool addStoredOption;  // true: the caller must synthesise an extra, selected
+                         // <option> for `stored` because it was not found
+};
+
+// `scanned` holds `scannedCount` entries from this scan pass (may be zero,
+// e.g. while a scan is still running). `stored` is Config's current ssid,
+// which may be empty on a fresh device -- there is nothing to protect there,
+// so both the match and the synthetic option are correctly absent.
+template <class Str>
+SsidDefault<Str> ssidDefaultFor(const Str* scanned, int scannedCount, const Str& stored) {
+  if (stored.length() == 0) return SsidDefault<Str>{-1, false};
+  for (int i = 0; i < scannedCount; i++) {
+    if (scanned[i] == stored) return SsidDefault<Str>{i, false};
+  }
+  return SsidDefault<Str>{-1, true};
+}

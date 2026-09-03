@@ -127,18 +127,41 @@ void startScan() {
 }
 
 void handleRoot() {
-  String nets;
   const int n = WiFi.scanComplete();
+  String scannedSsid[MAX_SCAN];
+  int shown = 0;
   if (n > 0) {
-    const int shown = n < MAX_SCAN ? n : MAX_SCAN;
-    for (int i = 0; i < shown; i++) {
-      const String ssid = WiFi.SSID(i);
-      if (!ssid.length()) continue;
-      const String esc = htmlEscape(ssid);
-      nets += "<option value='" + esc + "'>" + esc + " (" + String(WiFi.RSSI(i)) + " dBm)</option>";
-    }
+    shown = n < MAX_SCAN ? n : MAX_SCAN;
+    for (int i = 0; i < shown; i++) scannedSsid[i] = WiFi.SSID(i);
+  }
+
+  // See wifi_pass_policy.h: without this, the browser defaults the dropdown
+  // to whichever network scanned first, not the one already configured --
+  // saving with an unrelated setting changed would then silently switch WiFi
+  // networks (and, via resolveWifiPassword() below, wipe the stored password).
+  const String storedSsid(g_cfg->ssid);
+  const SsidDefault<String> ssidDefault =
+      ssidDefaultFor(scannedSsid, shown, storedSsid);
+
+  String nets;
+  if (ssidDefault.addStoredOption) {
+    // The configured network is not in this scan (out of range, a hidden
+    // SSID, or a scan that hasn't completed yet) -- keep it as the selected
+    // option anyway, rather than falling through to a scanned network the
+    // user never chose.
+    const String esc = htmlEscape(storedSsid);
+    nets += "<option value='" + esc + "' selected>" + esc + " (stored)</option>";
+  }
+  for (int i = 0; i < shown; i++) {
+    if (!scannedSsid[i].length()) continue;
+    const String esc = htmlEscape(scannedSsid[i]);
+    nets += "<option value='" + esc + "'";
+    if (i == ssidDefault.matchIndex) nets += " selected";
+    nets += ">" + esc + " (" + String(WiFi.RSSI(i)) + " dBm)</option>";
   }
   if (!nets.length()) {
+    // Reached only with no stored network AND nothing scanned -- a genuinely
+    // fresh device, where there is no prior configuration to protect.
     // scanComplete() returns -1 while a scan is running and -2 when one failed
     // or was never started. Collapsing both into "none found" is what made a
     // broken scan indistinguishable from an empty neighbourhood, so say which.
