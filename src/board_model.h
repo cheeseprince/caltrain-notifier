@@ -19,16 +19,10 @@
 
 #include "siri_parse.h"
 #include "timetable.h"
+#include "urgency.h"
 
 // How many departures the board shows.
 inline constexpr int BOARD_ROWS = 3;
-
-// Border colour, from the urgency rule this project was built around.
-enum Urgency {
-  URGENCY_GREEN,   // more than 15 minutes out — no hurry
-  URGENCY_YELLOW,  // 10 to 15 minutes inclusive — start moving
-  URGENCY_RED,     // under 10 minutes — go now
-};
 
 struct BoardRow {
   char    number[TRAIN_NUMBER_MAX + 1];
@@ -72,13 +66,13 @@ struct BoardModel {
 //                        day. After midnight but before service ends, that is
 //                        yesterday's midnight — which is exactly why this is a
 //                        parameter rather than something computed here.
+//   urgency              the user's border-colour bounds, from Config. Passed
+//                        in rather than read from a global so the merge stays
+//                        pure and the thresholds are testable on the host.
 //
 // Returns a board with count 0 when nothing is left to run today; the caller
 // then shows the overnight screen via firstScheduled().
 BoardModel buildBoard(const SiriResult& live, int originIdx, int destIdx,
                       uint8_t service, int64_t nowEpoch,
-                      int64_t serviceDayStartEpoch);
-
-// The border colour for a given whole-minute countdown. Exposed so the display
-// and the tests share one definition of the thresholds.
-Urgency urgencyFor(int32_t minutesAway);
+                      int64_t serviceDayStartEpoch,
+                      const UrgencyThresholds& urgency);

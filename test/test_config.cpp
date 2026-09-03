@@ -31,6 +31,11 @@ int main() {
     // A device that silently stops updating is worse than one that updates,
     // so the factory default has to be on, not off.
     check(d.otaAutoUpdate, "auto-update defaults to enabled");
+
+    // The urgency defaults have to reproduce the rule the sign shipped with —
+    // an existing device that takes this update must not see its colours move.
+    check(d.redUnder == kUrgencyDefaults.redUnder, "red threshold defaults to 10 min");
+    check(d.yellowUnder == kUrgencyDefaults.yellowUnder, "yellow threshold defaults to 16 min");
   }
 
   // --- Completeness ---------------------------------------------------------
@@ -113,6 +118,47 @@ int main() {
     Config before = c;
     configSanitise(c);
     check(memcmp(&before, &c, sizeof(Config)) == 0, "a valid config is left untouched");
+
+    // Zero minutes of red is a band no countdown can ever be inside, so the
+    // colour would simply never appear. The portal's min=1 says the same thing;
+    // this is the backstop for a hand-crafted POST that ignores it.
+    c = good();
+    c.redUnder = 0;
+    c.yellowUnder = 0;
+    configSanitise(c);
+    check(c.redUnder >= URGENCY_MIN_MINUTES, "a red threshold of zero is lifted to the minimum");
+    check(c.yellowUnder >= c.redUnder, "and yellow is never left below red");
+
+    // An hour of warning is already far more than this sign is useful for;
+    // beyond that the whole board would be one colour all day.
+    c = good();
+    c.redUnder = 200;
+    c.yellowUnder = 250;
+    configSanitise(c);
+    check(c.redUnder == URGENCY_MAX_MINUTES, "the red threshold is capped at 60 min");
+    check(c.yellowUnder == URGENCY_MAX_MINUTES, "so is the yellow one");
+
+    // Inverted bounds would make yellow unreachable. Raising yellow to meet red
+    // keeps the record meaning what the user most likely wanted — a red band of
+    // the width they asked for — rather than silently widening the red one.
+    c = good();
+    c.redUnder = 20;
+    c.yellowUnder = 5;
+    configSanitise(c);
+    check(c.redUnder == 20, "the red threshold survives an inverted pair");
+    check(c.yellowUnder == 20, "and yellow is raised to meet it, collapsing the band");
+    check(urgencyFor(19, UrgencyThresholds{c.redUnder, c.yellowUnder}) == URGENCY_RED,
+          "the normalised pair still reddens a close train");
+    check(urgencyFor(20, UrgencyThresholds{c.redUnder, c.yellowUnder}) == URGENCY_GREEN,
+          "and greens a distant one, with no yellow in between");
+
+    // An equal pair is a legitimate choice (no yellow band at all), not an
+    // error to be corrected — the same reading as an equal bright window.
+    c = good();
+    c.redUnder = 12;
+    c.yellowUnder = 12;
+    configSanitise(c);
+    check(c.redUnder == 12 && c.yellowUnder == 12, "a deliberately collapsed band survives");
 
     // configSanitise() has no opinion about this setting either way — it is
     // not something normalisation ever needs to correct.

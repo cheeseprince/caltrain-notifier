@@ -32,6 +32,13 @@ whether to keep sitting down:
 | 10 to 15 min | 🟡 Yellow | `#FFCE00` | start moving |
 | under 10 min | 🔴 Red | `#FF0000` | go now |
 
+Those are the **defaults**, not the rule. Both boundaries are set in the setup
+portal — "red when under N minutes" and "yellow when under M minutes", each 1 to
+60 — so a longer walk to the platform gets a longer warning. Setting the two to
+the same number drops the yellow band and leaves a red-and-green sign. The rule
+itself lives in [`src/urgency.h`](src/urgency.h); a device updating from an
+earlier build keeps 10 and 16, which is exactly the behaviour above.
+
 *The hex values are `render.cpp`'s RGB565 constants converted — `0x0640`,
 `0xFE60`, `0xF800`. The swatch above is generated from those same constants, so
 it cannot drift from what the panel lights up.*
@@ -242,7 +249,11 @@ On first boot the sign raises its own network and shows the details on screen:
 2. Open `http://192.168.4.1`.
 3. Pick your WiFi network, enter its password, paste the 511 token, and choose
    the two stations.
-4. Save. The sign restarts and starts showing departures.
+4. Optionally adjust the brightness window and the **border timers** — how many
+   minutes out the frame turns red and yellow. The defaults, 10 and 16, give the
+   bands in the table above; the form spells out what your numbers will do
+   before you save.
+5. Save. The sign restarts and starts showing departures.
 
 If the page stops loading partway, you have almost certainly come off the sign's
 network. Rejoin `Caltrain-XXXX` and open `http://192.168.4.1` again — nothing is
@@ -446,6 +457,7 @@ src/
   siri_parse.*      511 JSON -> departures                           [pure]
   board_model.*     merge live over schedule, express filter, colour [pure]
   service_day.*     Pacific time, DST, the 03:00 service rollover    [pure]
+  urgency.h         the red/yellow/green rule and its bounds         [pure]
   config.*          NVS settings; validation half is pure
   siri_client.*     HTTPS GET                                        [device]
   display_hw.*      panel init, backlight PWM                        [device]

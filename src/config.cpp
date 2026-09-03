@@ -24,6 +24,8 @@ Config configDefaults() {
   c.brightStartHour = 12;
   c.brightEndHour = 20;
   c.brightWeekdaysOnly = true;
+  c.redUnder = kUrgencyDefaults.redUnder;
+  c.yellowUnder = kUrgencyDefaults.yellowUnder;
   c.otaAutoUpdate = true;
   return c;
 }
@@ -69,6 +71,13 @@ void configSanitise(Config& c) {
   // permanently dim sign with no obvious cause. Fall back to the defaults.
   if (c.brightStartHour > 23) c.brightStartHour = 12;
   if (c.brightEndHour > 23) c.brightEndHour = 20;
+
+  // Out-of-range or inverted thresholds would leave a colour that can never
+  // appear on the border; urgency.h owns what "in range" means here.
+  UrgencyThresholds t{c.redUnder, c.yellowUnder};
+  urgencySanitise(t);
+  c.redUnder = t.redUnder;
+  c.yellowUnder = t.yellowUnder;
 }
 
 #ifdef ARDUINO
@@ -94,6 +103,10 @@ void configLoad(Config& c) {
   c.brightStartHour = p.getUChar("bstart", 12);
   c.brightEndHour = p.getUChar("bend", 20);
   c.brightWeekdaysOnly = p.getBool("bwkonly", true);
+  // A device updating from a build that predates these keys reads the defaults
+  // here, which are the thresholds it was already using.
+  c.redUnder = p.getUChar("redmin", kUrgencyDefaults.redUnder);
+  c.yellowUnder = p.getUChar("yelmin", kUrgencyDefaults.yellowUnder);
   c.otaAutoUpdate = p.getBool("otaauto", true);
   p.end();
 
@@ -116,6 +129,8 @@ void configSave(const Config& c) {
   p.putUChar("bstart", tmp.brightStartHour);
   p.putUChar("bend", tmp.brightEndHour);
   p.putBool("bwkonly", tmp.brightWeekdaysOnly);
+  p.putUChar("redmin", tmp.redUnder);
+  p.putUChar("yelmin", tmp.yellowUnder);
   p.putBool("otaauto", tmp.otaAutoUpdate);
   p.end();
 }

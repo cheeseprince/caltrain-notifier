@@ -149,7 +149,7 @@ void handleRoot() {
   }
 
   String html;
-  html.reserve(6000);
+  html.reserve(7000);
   html += F("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
             "<title>Caltrain Notifier setup</title><style>"
             "body{font-family:system-ui,sans-serif;margin:0;padding:20px;background:#111;color:#eee;}"
@@ -215,6 +215,23 @@ void handleRoot() {
   html += F("<div class=hint>Outside these hours the screen dims. Tap the screen — or "
             "press BOOT on the back — to light it up for a minute.</div>");
 
+  html += F("<hr style='border:0;border-top:1px solid #333;margin:24px 0'>"
+            "<label>Red border when under (minutes)</label>"
+            "<input name=redmin type=number min=1 max=60 step=1 required value='");
+  html += String(g_cfg->redUnder);
+  html += F("'><label>Yellow border when under (minutes)</label>"
+            "<input name=yelmin type=number min=1 max=60 step=1 required value='");
+  html += String(g_cfg->yellowUnder);
+  html += F("'><div class=hint>");
+  // See urgency.h: the exclusive-bound-to-inclusive-band conversion lives there
+  // so it can be host-tested (test_urgency), not in this Arduino-only file.
+  char bands[128];
+  urgencyBandsText(UrgencyThresholds{g_cfg->redUnder, g_cfg->yellowUnder},
+                   bands, sizeof(bands));
+  html += bands;
+  html += F(" Both count down to departure, and both bounds are exclusive. Set "
+            "them to the same number for a red-and-green sign with no yellow.</div>");
+
   html += F("<label style='display:flex;align-items:center;gap:10px'>"
             "<input type=checkbox name=otaauto value=1 style='width:auto'");
   if (g_cfg->otaAutoUpdate) html += F(" checked");
@@ -254,6 +271,11 @@ void handleSave() {
   const int origin = g_server.arg("origin").toInt();
   const int dest = g_server.arg("dest").toInt();
 
+  // toInt() reads a non-numeric field as 0, which the range check below
+  // rejects — so a browser that ignores type=number cannot get past this.
+  const int redUnder = g_server.arg("redmin").toInt();
+  const int yelUnder = g_server.arg("yelmin").toInt();
+
   // Must be computed against the OLD g_cfg->ssid/pass, before either is
   // overwritten below -- see wifi_pass_policy.h for the disambiguation rule.
   const String resolvedPass =
@@ -275,6 +297,13 @@ void handleSave() {
   else if (!keepStoredToken && token.length() < TOKEN_MIN_USABLE)
                                              problem = "That token looks too short.";
   else if (!routeValid(origin, dest))       problem = "Pick two different stations.";
+  else if (redUnder < URGENCY_MIN_MINUTES || redUnder > URGENCY_MAX_MINUTES ||
+           yelUnder < URGENCY_MIN_MINUTES || yelUnder > URGENCY_MAX_MINUTES)
+                                             problem = "Border timers must be between 1 and 60 minutes.";
+  // configSanitise() would silently raise yellow to meet red here. Saying so
+  // instead is the better answer on a form the user is looking at: an inverted
+  // pair is far more likely a typo than a request for no yellow band.
+  else if (yelUnder < redUnder)              problem = "The yellow timer must be at least the red one.";
 
   if (problem) {
     String html = F("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
@@ -304,6 +333,11 @@ void handleSave() {
   // leaving the sign permanently dim.
   g_cfg->brightStartHour = (uint8_t)g_server.arg("bstart").toInt();
   g_cfg->brightEndHour = (uint8_t)g_server.arg("bend").toInt();
+  // Range-checked above; configSanitise() below is still the backstop that
+  // keeps a hand-crafted POST from inverting the bands.
+  g_cfg->redUnder = (uint8_t)redUnder;
+  g_cfg->yellowUnder = (uint8_t)yelUnder;
+
   // An unchecked box is simply absent from the POST body.
   g_cfg->brightWeekdaysOnly = g_server.hasArg("bwkonly");
   g_cfg->otaAutoUpdate = g_server.hasArg("otaauto");

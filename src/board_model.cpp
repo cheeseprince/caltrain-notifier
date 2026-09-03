@@ -26,18 +26,10 @@ int findByNumber(const BoardRow* rows, int n, const char* number) {
 
 }  // namespace
 
-Urgency urgencyFor(int32_t minutesAway) {
-  // Boundaries are inclusive at the yellow band: exactly 15 is yellow, and
-  // exactly 10 is yellow. Only strictly under 10 is red, and strictly over 15
-  // is green. Stated here once so the display cannot drift from the tests.
-  if (minutesAway > 15) return URGENCY_GREEN;
-  if (minutesAway >= 10) return URGENCY_YELLOW;
-  return URGENCY_RED;
-}
-
 BoardModel buildBoard(const SiriResult& live, int originIdx, int destIdx,
                       uint8_t service, int64_t nowEpoch,
-                      int64_t serviceDayStartEpoch) {
+                      int64_t serviceDayStartEpoch,
+                      const UrgencyThresholds& urgency) {
   BoardModel board{};
   board.count = 0;
   board.anyLive = false;
@@ -142,7 +134,7 @@ BoardModel buildBoard(const SiriResult& live, int originIdx, int destIdx,
     // leaves now is never later than the number promised.
     row.minutesAway = (int32_t)((row.departure - nowEpoch) / 60);
     if (row.minutesAway < 0) row.minutesAway = 0;
-    row.urgency = urgencyFor(row.minutesAway);
+    row.urgency = urgencyFor(row.minutesAway, urgency);
 
     board.rows[board.count++] = row;
     if (row.isLive) board.anyLive = true;

@@ -53,7 +53,14 @@ SRC_CSRF  = test_csrf_check.cpp
 BIN_WPASS = test_wifi_pass_policy
 SRC_WPASS = test_wifi_pass_policy.cpp
 
-BINS = $(BIN_ROUTE) $(BIN_TT) $(BIN_SIRI) $(BIN_BOARD) $(BIN_SDAY) $(BIN_CFG) $(BIN_OTAMAN) $(BIN_OTAHLTH) $(BIN_OTAVER) $(BIN_HTMLESC) $(BIN_CSRF) $(BIN_WPASS)
+# Header-only, and host-tested for the same reason as the two above:
+# urgencyBandsText() was written inside portal.cpp behind #ifdef ARDUINO, where
+# its off-by-one (an exclusive bound printed as an inclusive band) was
+# unreachable from any test.
+BIN_URG   = test_urgency
+SRC_URG   = test_urgency.cpp
+
+BINS = $(BIN_ROUTE) $(BIN_TT) $(BIN_SIRI) $(BIN_BOARD) $(BIN_SDAY) $(BIN_CFG) $(BIN_OTAMAN) $(BIN_OTAHLTH) $(BIN_OTAVER) $(BIN_HTMLESC) $(BIN_CSRF) $(BIN_WPASS) $(BIN_URG)
 
 all: $(BINS)
 	@fail=0; for b in $(BINS); do ./$$b || fail=1; done; \
@@ -69,13 +76,13 @@ $(BIN_TT): $(SRC_TT) ../src/timetable.h ../src/timetable_data.h ../src/route.h .
 $(BIN_SIRI): $(SRC_SIRI) ../src/siri_parse.h ../src/timetable_data.h ../third_party/ArduinoJson.h
 	$(CXX) $(CXXFLAGS) $(SRC_SIRI) -o $(BIN_SIRI)
 
-$(BIN_BOARD): $(SRC_BOARD) ../src/board_model.h ../src/timetable.h ../src/siri_parse.h
+$(BIN_BOARD): $(SRC_BOARD) ../src/board_model.h ../src/urgency.h ../src/timetable.h ../src/siri_parse.h
 	$(CXX) $(CXXFLAGS) $(SRC_BOARD) -o $(BIN_BOARD)
 
 $(BIN_SDAY): $(SRC_SDAY) ../src/service_day.h ../src/timetable.h
 	$(CXX) $(CXXFLAGS) $(SRC_SDAY) -o $(BIN_SDAY)
 
-$(BIN_CFG): $(SRC_CFG) ../src/config.h ../src/route.h
+$(BIN_CFG): $(SRC_CFG) ../src/config.h ../src/urgency.h ../src/route.h
 	$(CXX) $(CXXFLAGS) $(SRC_CFG) -o $(BIN_CFG)
 
 $(BIN_OTAMAN): $(SRC_OTAMAN) ../src/ota_manifest.h
@@ -95,6 +102,9 @@ $(BIN_CSRF): $(SRC_CSRF) ../src/csrf_check.h
 
 $(BIN_WPASS): $(SRC_WPASS) ../src/wifi_pass_policy.h
 	$(CXX) $(CXXFLAGS) $(SRC_WPASS) -o $(BIN_WPASS)
+
+$(BIN_URG): $(SRC_URG) ../src/urgency.h
+	$(CXX) $(CXXFLAGS) $(SRC_URG) -o $(BIN_URG)
 
 clean:
 	rm -f $(BINS)

@@ -389,7 +389,8 @@ void doTick() {
     live = SiriResult{};
   }
 
-  g_board = buildBoard(live, g_cfg.originIdx, g_cfg.destIdx, service, now, day.startEpoch);
+  g_board = buildBoard(live, g_cfg.originIdx, g_cfg.destIdx, service, now, day.startEpoch,
+                       UrgencyThresholds{g_cfg.redUnder, g_cfg.yellowUnder});
 
   const char* originName = kStations[g_cfg.originIdx].name;
   const char* destName = kStations[g_cfg.destIdx].name;

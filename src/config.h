@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "route.h"
+#include "urgency.h"
 
 // A 511 token is a 36-character UUID. The buffer allows a little slack in case
 // the format ever changes, but the length check below stays strict enough to
@@ -48,6 +49,14 @@ struct Config {
   // Restrict the bright window to Monday-Friday. A commute sign has no reason
   // to be at full brightness on a Sunday afternoon.
   bool brightWeekdaysOnly;
+
+  // Border-colour bounds, in whole minutes. Both are exclusive and both read
+  // the same way — see urgency.h, which owns the rule and the 1..60 limits.
+  // Defaults are 10 and 16, i.e. exactly the behaviour the sign had when these
+  // were compiled in, so taking this update changes nothing until someone opens
+  // the setup page.
+  uint8_t redUnder;
+  uint8_t yellowUnder;
 
   // Let the sign install firmware updates on its own daily check. Defaults to
   // on: a sign that silently stops updating is a worse failure mode than one

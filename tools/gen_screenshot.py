@@ -202,6 +202,9 @@ def render_legend():
     # The number in each swatch is a representative countdown, drawn in the
     # band's own colour and at the board's countdown size -- so the legend reads
     # as three miniature rows of the real display rather than as abstract chips.
+    # The bands are the shipped DEFAULTS (kUrgencyDefaults in src/urgency.h,
+    # 10 and 16). They are adjustable per device in the setup portal, so this
+    # legend documents what a fresh sign does, not a rule fixed in firmware.
     rows = [
         ("22", "more than 15 min", "COL_GREEN",  "plenty of time"),
         ("12", "10 to 15 min",     "COL_YELLOW", "start moving"),
