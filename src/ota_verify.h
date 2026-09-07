@@ -1,9 +1,15 @@
 // ota_verify.h — is this manifest really ours?
 //
-// The release channel is fetched over TLS with setInsecure(), so certificate
-// validation is deliberately not the control here. Authenticity comes from a
-// detached ECDSA-P256/SHA-256 signature over the exact bytes of manifest.txt,
-// checked against a public key compiled into the firmware.
+// Authenticity comes from a detached ECDSA-P256/SHA-256 signature over the
+// exact bytes of manifest.txt, checked against a public key compiled into the
+// firmware. The release channel is also fetched over TLS with the server
+// certificate validated (ota_task.cpp), but that is a separate control with a
+// separate job: the certificate proves the manifest came from the release host
+// just now, the signature proves it was published by the holder of the signing
+// key. Neither replaces the other — a signature never expires, so certificate
+// validation is what stops an on-path attacker replaying an old, still-valid
+// manifest as a downgrade; and a valid certificate says nothing about who
+// signed the bytes behind it.
 //
 // There is no unsigned mode. An empty, null or unparseable key, an empty
 // signature, or a failed check all return false. obd-gauge-cluster ships an

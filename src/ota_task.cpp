@@ -86,6 +86,17 @@ constexpr size_t CHUNK = 1024;
 // project's fast path.
 constexpr uint32_t IO_DEADLINE_MS = 20000;
 
+// The same Mozilla root CA bundle the 511 fetch validates against — see the
+// longer note in siri_client.cpp for how it gets into the image. Referencing
+// the symbol from a second translation unit costs nothing extra: it is already
+// linked in for siri_client.cpp, so the ~64 KB is paid once.
+//
+// Same core-version caveat applies: core 2.x's setCACertBundle() takes only
+// this start pointer, core 3.x added a length, and platformio.ini pins 2.x.
+extern "C" {
+extern const uint8_t rootca_crt_bundle_start[] asm("_binary_x509_crt_bundle_start");
+}
+
 SemaphoreHandle_t g_lock = nullptr;  // guards g_busy and g_progress below
 SemaphoreHandle_t g_wake = nullptr;  // signals the task that start() was called
 bool              g_busy = false;
@@ -163,13 +174,21 @@ void logStackHeadroom() {
 // same "capped GET, refuse rather than truncate" shape.
 int fetchCapped(const char* path, uint8_t* buf, size_t cap) {
   WiFiClientSecure net;
-  // Deliberately setInsecure(), not certificate pinning. See ota_verify.h:
-  // authenticity comes from the manifest signature checked in runAttempt(),
-  // integrity from the SHA-256 checked before the image slot is activated.
-  // TLS here only has to keep the transfer private, which setInsecure()
-  // still does — it skips validating who is on the other end, not the
-  // encryption itself.
-  net.setInsecure();
+  // Validated against the Mozilla root bundle, the same way siri_client.cpp
+  // validates the 511 fetch. This does NOT replace the checks in runAttempt()
+  // — the manifest signature is still the root of authenticity (see
+  // ota_verify.h) and the SHA-256 is still what proves the bytes in the flash
+  // slot are the ones the manifest named. What certificate validation adds is
+  // freshness, which the signature by itself cannot give: a signature is valid
+  // forever, so an on-path attacker who could impersonate the release host was
+  // free to replay a manifest.txt/manifest.sig pair from an older published
+  // release. Because otaUpdateApplies() compares versions by string
+  // inequality by design, that replay is a downgrade — a silent way to push a
+  // device back onto a release with a known bug. Requiring a valid certificate
+  // for the release host is what closes it: an attacker who cannot terminate
+  // TLS as that host cannot serve the old-but-validly-signed pair in the first
+  // place.
+  net.setCACertBundle(rootca_crt_bundle_start);
 
   HTTPClient http;
   http.setConnectTimeout(10000);
@@ -252,9 +271,15 @@ void hexEncodeSha256(const uint8_t hash[32], char out[65]) {
 // a byte that has not been authenticated. Reordering this — for instance,
 // looking up the release before verifying, "just to decide whether it's
 // worth fetching the signature" — would let an attacker who controls the
-// release channel (or merely a MITM on an unauthenticated TLS connection,
-// which is exactly what setInsecure() allows) choose what this device
-// installs.
+// release channel choose what this device installs.
+//
+// The transport is the second half of that story. Both fetches below validate
+// the release host's certificate against the Mozilla root bundle, so an
+// on-path attacker cannot stand in for it. That is what makes the ordering
+// above sufficient rather than merely necessary: a signature has no expiry, so
+// without certificate validation an attacker could serve a genuine, correctly
+// signed manifest from an OLDER release and every check here would pass on its
+// way to a downgrade.
 void runAttempt() {
   // --- Step 1: fetch manifest.txt, capped. ---------------------------------
   setPhase(OTA_MANIFEST);
@@ -335,7 +360,7 @@ void runAttempt() {
   setPhase(OTA_DOWNLOAD);
 
   WiFiClientSecure net;
-  net.setInsecure();  // see the note in fetchCapped(): deliberate, not an oversight.
+  net.setCACertBundle(rootca_crt_bundle_start);  // see the note in fetchCapped()
   HTTPClient http;
   http.setConnectTimeout(10000);
   http.setTimeout(15000);

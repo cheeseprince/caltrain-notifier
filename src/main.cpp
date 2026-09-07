@@ -95,6 +95,19 @@ bool joinWifi(const Config& cfg) {
   if (WiFi.status() == WL_CONNECTED) return true;
 
   // Was it even there? A scan after a failed join tells us which message to show.
+  //
+  // The disconnect first is load-bearing, exactly as in portal.cpp's
+  // startScan() — see the comment there for the measurement. WiFi.begin()
+  // leaves _autoReconnect on (the Arduino core default), so after the wait
+  // above times out the STA is still cycling through connect attempts. A scan
+  // started in that state is refused by esp_wifi_scan_start() with
+  // ESP_ERR_WIFI_STATE ("wifi still connecting when invoke
+  // esp_wifi_scan_start"), so BOTH calls below return WIFI_SCAN_FAILED,
+  // `visible` stays false, and a wrong password is reported as "network not in
+  // range" — the one message guaranteed to send you looking in the wrong
+  // place. wifioff=false stops the reconnect cycle without powering the radio
+  // down, which is all that is needed to make the STA scannable.
+  WiFi.disconnect(/*wifioff=*/false);
   int n = WiFi.scanNetworks();
   if (n == WIFI_SCAN_FAILED) {
     // The first scan after a mode change can fail outright; one retry is enough.
@@ -214,7 +227,19 @@ bool syncClock() {
 uint8_t brightnessFor(const ServiceDay& day) {
   // A press wins over the schedule for a minute, so the sign can be woken to
   // read it outside its usual hours without changing the configuration.
-  if (g_wakeUntil && (int32_t)(millis() - g_wakeUntil) < 0) return g_cfg.brightnessDay;
+  //
+  // Clearing the deadline once it has passed is not tidiness, it is the fix
+  // for a wrap bug. The signed delta below is only meaningful for about 24.8
+  // days either side of the deadline: leave a stale g_wakeUntil in place and,
+  // once millis() has run 2^31 ms past it, (int32_t)(millis() - g_wakeUntil)
+  // goes negative again and the sign sits at full brightness for the next
+  // ~24.8 days regardless of the schedule. Resetting to 0 restores the "no
+  // wake pending" meaning of the sentinel, so the comparison is only ever
+  // made against a deadline that is genuinely in flight.
+  if (g_wakeUntil) {
+    if ((int32_t)(millis() - g_wakeUntil) < 0) return g_cfg.brightnessDay;
+    g_wakeUntil = 0;
+  }
   return inBrightWindow(g_cfg, day.localHour, day.dayOfWeek) ? g_cfg.brightnessDay
                                                              : g_cfg.brightnessNight;
 }

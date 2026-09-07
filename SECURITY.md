@@ -30,7 +30,7 @@ The interesting surfaces, roughly in order of how much they are worth looking at
 | **The setup portal** | A SoftAP captive portal that accepts the WiFi password and the token over plain HTTP on `192.168.4.1`. It is CSRF-guarded and only runs when the device is unconfigured or `BOOT` is held at power-on, but it is the one place secrets are typed in. |
 | **JSON parsing of a remote feed** | `siri_parse.cpp` consumes whatever `api.511.org` returns. Malformed or hostile input reaching a crash or an overflow is in scope; the host tests under `test/` are the place to add a reproducing case. |
 | **TLS** | Certificates are validated against the Mozilla root bundle. A regression to `setInsecure()`, or any path that skips validation, is a real finding. |
-| **The OTA release channel** | The one path that can put arbitrary code on the device unattended. Its trust model is deliberately different from the row above — see the next section before flagging `setInsecure()` there as a regression. |
+| **The OTA release channel** | The one path that can put arbitrary code on the device unattended. It validates certificates like the row above, and layers a signature and a hash on top of that — see the next section for what each of the three is actually protecting against. |
 
 ## Over-the-air update trust model
 
@@ -42,12 +42,18 @@ cannot prove who published what it just downloaded, so the design puts every
 bit of trust in one place and states it plainly here rather than leaving it
 implicit in the code.
 
-- **TLS uses `setInsecure()` — deliberately, not by omission.** The OTA
-  fetches skip certificate validation entirely (`src/ota_task.cpp`,
-  `fetchCapped()`). That is safe here only because certificate validation is
-  not what makes this channel trustworthy: authenticity comes from the
-  signature below, checked independently of the transport. TLS is doing one
-  job — keeping the transfer private — not the job of proving who sent it.
+- **The OTA fetches validate the GitHub Pages certificate** against the same
+  Mozilla root bundle as the 511 fetch (`src/ota_task.cpp`, `fetchCapped()`
+  and step 5 of `runAttempt()`; the bundle symbol is shared with
+  `src/siri_client.cpp`). Authenticity still comes from the signature below,
+  checked independently of the transport — but a signature has no expiry, so
+  it alone cannot prove the manifest just fetched is the *current* one. An
+  on-path attacker able to impersonate the release host could otherwise replay
+  a genuine, correctly signed `manifest.txt`/`manifest.sig` pair from an older
+  release, and because `otaUpdateApplies()` compares versions by string
+  inequality by design, that replay is a silent downgrade onto a release with
+  a known bug. Requiring a valid certificate for the release host is what
+  closes that path.
 - **`manifest.txt` must carry a detached ECDSA-P256/SHA-256 signature**,
   checked against the public key compiled into the running firmware
   (`src/ota_pubkey.h`, verified in `src/ota_verify.cpp` via mbedtls). This is

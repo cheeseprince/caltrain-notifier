@@ -1,10 +1,11 @@
 // Host tests for OTA manifest signature verification.
 //
-// This is the only thing standing between a manipulated release channel and
-// arbitrary code running on the sign: TLS uses setInsecure(), so anyone able to
-// intercept the connection supplies both the manifest and the binary, and the
-// SHA-256 then only proves those two agree with each other. The signature is
-// what makes them provably ours.
+// This is the control that stands between a manipulated release channel and
+// arbitrary code running on the sign. TLS validates the release host's
+// certificate (ota_task.cpp), but a compromised or impersonated host still
+// supplies both the manifest and the binary, and the SHA-256 then only proves
+// those two agree with each other. The signature is what makes them provably
+// ours.
 //
 // Fixtures come from tools/gen_ota_test_vectors.sh (throwaway keypair).
 #include <cstdio>
