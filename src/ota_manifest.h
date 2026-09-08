@@ -40,6 +40,13 @@ bool otaManifestFind(const char* manifest, const char* env, OtaRelease* out);
 // for an update. Without this explicit guard, the release channel going live
 // would mean every developer build on the bench reflashes itself to the
 // published release ~75s after boot, mid bring-up or debugging.
+//
+// A "dev-"-prefixed rel.version is NEVER installed either, for the mirror
+// reason: release.yml's workflow_dispatch path signs a "dev-<sha>" build like
+// any other, and inequality alone would have every tagged unit in the field
+// take it — after which the guard above stops each of them from ever updating
+// again. Refusing an offered dev- version here means that outcome cannot be
+// produced by a workflow change or a stray manual run.
 bool otaUpdateApplies(const OtaRelease& rel, const char* currentVersion);
 
 // How long a version stays suppressed after the health gate rejects it and

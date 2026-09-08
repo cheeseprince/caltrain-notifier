@@ -136,6 +136,24 @@ int main() {
     // "dev" elsewhere in the string must still update normally, or the guard
     // is broader than intended.
     check(otaUpdateApplies(r, "develop-1.0"), "a version merely containing dev still updates");
+
+    // The mirror image of the guard above: a "dev-" version must never be
+    // OFFERED to a real release either. release.yml's workflow_dispatch path
+    // stamps and signs a "dev-<sha>" build exactly like a tag; if that ever
+    // reaches the channel, string inequality alone would have every v-tagged
+    // unit in the field install it -- and, per the guard above, a unit running
+    // a dev- build then refuses every future update, so the whole fleet is
+    // stranded until each unit is USB-reflashed. Refusing an offered dev-
+    // version in the firmware closes that regardless of what the workflow does.
+    OtaRelease dev = r;
+    strcpy(dev.version, "dev-abc1234");
+    check(!otaUpdateApplies(dev, "v1.2.0"), "a dev- release is never offered to a real build");
+    check(!otaUpdateApplies(dev, "v1.1.0"), "a dev- release is never offered, even as a 'newer' one");
+    check(!otaUpdateApplies(dev, "dev-local"), "a dev- release is never offered to a dev build either");
+    // Same prefix rule as the running-version guard: only "dev-" is refused.
+    OtaRelease devish = r;
+    strcpy(devish.version, "develop-1.0");
+    check(otaUpdateApplies(devish, "v1.2.0"), "an offered version merely containing dev still applies");
   }
 
   // --- Suppressing a just-rejected version (C2) ------------------------------

@@ -91,6 +91,18 @@ bool otaUpdateApplies(const OtaRelease& rel, const char* currentVersion) {
   // since "dev-local" never equals a real release tag.
   if (strncmp(currentVersion, "dev-", 4) == 0) return false;
 
+  // And the mirror image: a "dev-" version is never OFFERED either. The
+  // release workflow's manual (workflow_dispatch) path stamps and signs a
+  // "dev-<sha>" build exactly like a tagged one, so nothing about the
+  // signature distinguishes it. Without this check, a dev- manifest reaching
+  // the channel would satisfy the inequality below on every v-tagged unit in
+  // the field, each would install it, and — by the guard just above — each
+  // would then refuse every future update. That is a whole fleet stranded
+  // until USB-reflashed, by one click in the Actions tab. release.yml also
+  // withholds dev- builds from gh-pages, but the firmware must not depend on
+  // the workflow staying that way; this is the check that holds regardless.
+  if (strncmp(rel.version, "dev-", 4) == 0) return false;
+
   return strcmp(rel.version, currentVersion) != 0;
 }
 

@@ -4,7 +4,14 @@
 # Cut a release with:
 #   git tag v1.2.0 && git push --tags
 # or run manually from the Actions tab (workflow_dispatch) to produce a
-# dev-<hash> build without cutting a tag.
+# dev-<hash> build without cutting a tag. A manual run builds and signs
+# exactly as a tag does, but its output is attached to the workflow run as
+# an artifact and is NOT published to gh-pages: a dev-<hash> manifest on the
+# channel would be installed by every tagged unit in the field (string
+# inequality), after which each unit's own dev- guard would refuse all
+# further updates -- a fleet stranded until USB-reflashed. The firmware
+# refuses an offered dev- version too (src/ota_manifest.cpp), so this gate
+# is the first of two, not the only one.
 #
 # THREE DELIBERATE DIVERGENCES from the sibling project's release.yml
 # (obd-gauge-cluster), all because this device installs updates unattended
@@ -26,7 +33,7 @@
 # Every third-party action is pinned to a 40-character commit SHA, matching
 # ci.yml's convention -- resolved from each action's release tag via the
 # GitHub API, not typed from memory. PlatformIO is pinned to the exact
-# version ci.yml's device-build job uses (6.1.19): this is the build that
+# version ci.yml's device-build job uses (6.2.0): this is the build that
 # produces the binary being cryptographically signed, so an unpinned
 # toolchain would make the signed artifact non-reproducible.
 name: Release
@@ -188,12 +195,29 @@ jobs:
       # API, not typed from memory) -- the sibling project's release.yml uses
       # the floating tag `@v4`, which is the one thing about this action's
       # use that is NOT being copied here (see the file header).
+      #
+      # Tag pushes only. A workflow_dispatch run gets the artifact step below
+      # instead -- see the file header for why a dev-<hash> build must never
+      # reach the channel.
       - name: Publish to gh-pages
+        if: github.ref_type == 'tag'
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453  # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./out
           keep_files: false
+
+      # The manual-run counterpart: the same four signed files, attached to
+      # the run so they can be pulled down and USB-flashed onto a bench unit,
+      # without ever touching gh-pages. Same pinned upload-artifact SHA as
+      # ci.yml's fuzz corpus step.
+      - name: Attach the dev build to this run (manual runs only)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: dev-build-${{ env.VERSION }}
+          path: out/
+          retention-days: 14
 
       # Everything above is genuinely published the moment it lands on
       # gh-pages, but only someone who already knows this project uses
