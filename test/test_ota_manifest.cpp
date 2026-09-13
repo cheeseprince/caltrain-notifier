@@ -4,8 +4,10 @@
 // This runs before anything is downloaded, so a parser that accepts a
 // malformed or wrong-environment line is how a v2.0 panel ends up flashing a
 // v2.2 binary. Every rejection case below is a real way that can happen.
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include "ota_manifest.h"
 
 static int failures = 0;
@@ -57,6 +59,48 @@ int main() {
           "finds caltrain even when caltrain_v20 is listed first");
     check(strcmp(r.file, "caltrain.bin") == 0,
           "a v2.2 board is never handed the v2.0 image");
+  }
+
+  // A third environment: caltrain_es3c28p, the QDtech 2.8" ESP32-S3 board.
+  // "caltrain" is a prefix of it just as it is of caltrain_v20, and this board
+  // is a different chip entirely — handing it a CrowPanel image, or the
+  // reverse, flashes firmware that cannot run. Every listing order of the
+  // three lines is tried, because the guard is only exercised when a longer
+  // name precedes the shorter one it starts with.
+  {
+    const char* line[3] = {
+        "caltrain v1.2.0 2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881 1140256 caltrain.bin\n",
+        "caltrain_v20 v1.2.0 9f2c8ab1d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f 1140256 caltrain_v20.bin\n",
+        "caltrain_es3c28p v1.2.0 5b0e3c7a9d1f24680ace13579bdf02468ace13579bdf02468ace13579bdf0246 1098393 caltrain_es3c28p.bin\n",
+    };
+    const char* env[3] = {"caltrain", "caltrain_v20", "caltrain_es3c28p"};
+    const char* file[3] = {"caltrain.bin", "caltrain_v20.bin", "caltrain_es3c28p.bin"};
+
+    int order[3] = {0, 1, 2};
+    int orders = 0;
+    do {
+      std::string manifest;
+      for (int i : order) manifest += line[i];
+      for (int e = 0; e < 3; e++) {
+        OtaRelease r{};
+        const bool found = otaManifestFind(manifest.c_str(), env[e], &r);
+        char what[160];
+        snprintf(what, sizeof what, "%s finds only its own line (order %d%d%d)", env[e],
+                 order[0], order[1], order[2]);
+        check(found && strcmp(r.file, file[e]) == 0, what);
+      }
+      orders++;
+    } while (std::next_permutation(order, order + 3));
+    check(orders == 6, "all six listing orders were exercised");
+
+    // A manifest carrying only one board's line offers nothing to the others.
+    OtaRelease r{};
+    check(!otaManifestFind(line[2], "caltrain", &r),
+          "caltrain does not prefix-match a caltrain_es3c28p line");
+    check(!otaManifestFind(line[2], "caltrain_v20", &r),
+          "caltrain_v20 does not match a caltrain_es3c28p line");
+    check(!otaManifestFind(line[0], "caltrain_es3c28p", &r),
+          "caltrain_es3c28p does not match a caltrain line");
   }
 
   // --- Malformed input ------------------------------------------------------

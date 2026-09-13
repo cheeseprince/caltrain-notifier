@@ -60,7 +60,13 @@ SRC_WPASS = test_wifi_pass_policy.cpp
 BIN_URG   = test_urgency
 SRC_URG   = test_urgency.cpp
 
-BINS = $(BIN_ROUTE) $(BIN_TT) $(BIN_SIRI) $(BIN_BOARD) $(BIN_SDAY) $(BIN_CFG) $(BIN_OTAMAN) $(BIN_OTAHLTH) $(BIN_OTAVER) $(BIN_HTMLESC) $(BIN_CSRF) $(BIN_WPASS) $(BIN_URG)
+# Header-only: the 2.8" panel's short station names (station_label.h). Built
+# against the generated stations.h so a regeneration that renames a mapped
+# station fails here.
+BIN_SLABEL = test_station_label
+SRC_SLABEL = test_station_label.cpp
+
+BINS = $(BIN_ROUTE) $(BIN_TT) $(BIN_SIRI) $(BIN_BOARD) $(BIN_SDAY) $(BIN_CFG) $(BIN_OTAMAN) $(BIN_OTAHLTH) $(BIN_OTAVER) $(BIN_HTMLESC) $(BIN_CSRF) $(BIN_WPASS) $(BIN_URG) $(BIN_SLABEL)
 
 all: $(BINS)
 	@fail=0; for b in $(BINS); do ./$$b || fail=1; done; \
@@ -105,6 +111,9 @@ $(BIN_WPASS): $(SRC_WPASS) ../src/wifi_pass_policy.h
 
 $(BIN_URG): $(SRC_URG) ../src/urgency.h
 	$(CXX) $(CXXFLAGS) $(SRC_URG) -o $(BIN_URG)
+
+$(BIN_SLABEL): $(SRC_SLABEL) ../src/station_label.h ../src/stations.h
+	$(CXX) $(CXXFLAGS) $(SRC_SLABEL) -o $(BIN_SLABEL)
 
 clean:
 	rm -f $(BINS)

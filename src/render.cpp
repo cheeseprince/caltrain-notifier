@@ -7,6 +7,11 @@
 #include <time.h>
 
 #include "display_hw.h"
+#include "layout.h"
+#include "station_label.h"
+
+// Every per-board position, font choice and the splash text come from layout.h.
+using namespace layout;
 
 // There is deliberately NO logo on any screen. An earlier version could push a
 // bitmap plate here when a generated header was present; that header held
@@ -47,68 +52,48 @@ constexpr uint16_t COL_LATE    = 0xFD20;  // amber, for a delay figure
 constexpr uint16_t COL_SCHED   = 0x05FF;  // cyan, marks a non-live row
 
 // --- Geometry -------------------------------------------------------------
-constexpr int BORDER = 8;                       // urgency frame thickness
+// BORDER, HEADER_H, SCREEN_W/H, the fonts and the column offsets are per board,
+// in layout.h. Everything here is derived from them.
 constexpr int INNER_X = BORDER;
 constexpr int INNER_Y = BORDER;
-constexpr int INNER_W = SCREEN_W - 2 * BORDER;  // 464
-constexpr int INNER_H = SCREEN_H - 2 * BORDER;  // 304
+constexpr int INNER_W = SCREEN_W - 2 * BORDER;  // 464 on the 3.5", 308 on the 2.8"
+constexpr int INNER_H = SCREEN_H - 2 * BORDER;  // 304 / 228
 
 // The header carries the two things you read without caring about any
-// particular train: where this sign is pointed, and what time it is now. They
-// sit on one line at the same size, which is also the only option — font 6 has
-// no letters in it, so the route name cannot be set any larger than font 4 and
-// the clock comes down to match rather than towering over it.
-constexpr int HEADER_H = 52;
+// particular train: where this sign is pointed, and what time it is now. On
+// the 3.5" they sit on one line at the same size, which is also the only
+// option there — font 6 has no letters in it, so the route name cannot be set
+// any larger than font 4 and the clock comes down to match rather than
+// towering over it. The 2.8" sets the route smaller and may wrap it.
 constexpr int ROWS_Y = INNER_Y + HEADER_H;
-constexpr int ROW_H = (INNER_H - HEADER_H) / BOARD_ROWS;  // 84
+constexpr int ROW_H = (INNER_H - HEADER_H) / BOARD_ROWS;  // 84 / 58
 
-// Fonts. TFT_eSPI's built-ins: 2 is ~16px, 4 is ~26px, 6 is ~48px and covers
-// digits, colon and the a/p of an am/pm clock — which is exactly the header
-// clock and the big countdown, and nothing else.
-constexpr uint8_t FONT_SMALL = 2;
-constexpr uint8_t FONT_MED   = 4;
-constexpr uint8_t FONT_BIG   = 6;
+#ifndef BOARD_ES3C28P
+// The 3.5"'s countdown and "min" label were drawn at ROW_H / 2 - 2 and
+// ROW_H / 2 + 4 before layout.h named those positions. Hold the names to it.
+static_assert(COUNT_DY == ROW_H / 2 - 2 && MIN_LABEL_DY == ROW_H / 2 + 4,
+              "CrowPanel countdown position changed");
+#endif
 
 // Column offsets within a row.
-constexpr int COL_MIN_R = INNER_X + 108;  // right edge of the big countdown
-constexpr int COL_INFO  = INNER_X + 156;  // departure time, train, service
-constexpr int COL_RIGHT = INNER_X + INNER_W - 8;
+constexpr int COL_MIN_R = INNER_X + COUNT_R;     // right edge of the big countdown
+constexpr int COL_INFO  = INNER_X + COL_INFO_X;  // departure time, train, service
+constexpr int COL_RIGHT = INNER_X + INNER_W - COL_RIGHT_INSET;
 
 // --- Boot screens ---------------------------------------------------------
 // Splash: the product name, then the attribution block, then a status line that
-// updates as boot progresses. The attribution is on the SPLASH rather than
-// buried in a menu because this screen is guaranteed to be seen — every boot,
-// by whoever owns the sign and by anyone who happens to be looking at it — and
-// because a device that displays another organisation's data ought to say whose
-// data it is and whose product it is not.
-constexpr int SPLASH_TITLE_Y = 74;
-constexpr int SPLASH_ATTR_Y  = 126;   // first attribution line
-constexpr int SPLASH_ATTR_DY = 20;    // line pitch, FONT_SMALL
-constexpr int SPLASH_NOTE_Y  = 282;
+// updates as boot progresses. Positions (SPLASH_*) and the attribution text
+// itself (kSplashAttribution) are per board, in layout.h, along with why the
+// attribution is on this screen at all.
 
-// Kept to the panel width at FONT_SMALL. Wording tracks ATTRIBUTION.md; if one
-// changes the other should too.
-constexpr const char* kSplashAttribution[] = {
-    "Not affiliated with, endorsed by, or sponsored by",
-    "Caltrain or the Peninsula Corridor Joint Powers Board.",
-    "\"Caltrain\" is their trademark, used only to name",
-    "the service whose departures this sign displays.",
-    "",
-    "Live data: 511 SF Bay   Schedule: Caltrain GTFS",
-    "This firmware: MIT licensed, no warranty.",
-};
-constexpr int kSplashAttributionLines =
-    (int)(sizeof(kSplashAttribution) / sizeof(kSplashAttribution[0]));
-
-// Checklist. Four rows of 44px starting below the headline, each one a marker,
-// a label in the left column and a value beside it.
-constexpr int STEP_HEAD_Y   = INNER_Y + 24;
-constexpr int STEP_TOP      = INNER_Y + 84;
-constexpr int STEP_ROW_H    = 44;
-constexpr int STEP_MARK_X   = INNER_X + 56;   // centre of the marker
-constexpr int STEP_LABEL_X  = INNER_X + 84;
-constexpr int STEP_VALUE_X  = INNER_X + 184;
-constexpr int STEP_MARK_R   = 7;              // marker radius
+// Checklist. Four rows starting below the headline, each one a marker, a label
+// in the left column and a value beside it. Row height and offsets: layout.h.
+constexpr int STEP_HEAD_Y   = INNER_Y + STEP_HEAD_DY;
+constexpr int STEP_TOP      = INNER_Y + STEP_TOP_DY;
+constexpr int STEP_MARK_X   = INNER_X + STEP_MARK_DX;   // centre of the marker
+constexpr int STEP_LABEL_X  = INNER_X + STEP_LABEL_DX;
+constexpr int STEP_VALUE_X  = INNER_X + STEP_VALUE_DX;
+constexpr int STEP_MARK_R   = 7;                        // marker radius
 
 // Checklist markers, drawn rather than typed: the built-in fonts have no tick
 // glyph, and a shape reads faster than a punctuation character anyway.
@@ -146,17 +131,7 @@ uint16_t urgencyColour(Urgency u) {
 }
 
 // --- Update screen ----------------------------------------------------------
-// Geometry for updating(). Position numbers come from the task brief's layout
-// table; there is no other screen this one's proportions need to match.
-constexpr int UPD_TITLE_Y = 70;
-constexpr int UPD_VER_Y   = 115;
-constexpr int UPD_BAR_X   = 60;
-constexpr int UPD_BAR_Y   = 160;
-constexpr int UPD_BAR_W   = 360;  // right edge at 420
-constexpr int UPD_BAR_H   = 30;   // bottom edge at 190
-constexpr int UPD_PCT_Y   = 205;
-constexpr int UPD_STEP_Y  = 240;
-constexpr int UPD_WARN_Y  = 265;
+// Geometry for updating() is per board: UPD_* in layout.h.
 
 // --- Cached state ---------------------------------------------------------
 // Only fields that changed are repainted. A full fillScreen at 27 MHz takes
@@ -243,6 +218,14 @@ void formatClockMin(uint16_t depMin, char* out, size_t cap) {
   snprintf(out, cap, "%02d:%02d", (depMin / 60) % 24, depMin % 60);
 }
 
+// A station name as the route header shows it. The 2.8" panel uses the short
+// forms in station_label.h for the two names that push route pairs onto a
+// second line; the 3.5" shows every name in full. Headers only — nothing else
+// on any screen is shortened.
+const char* headerName(const char* name) {
+  return SHORT_STATION_NAMES ? stationHeaderName(name) : name;
+}
+
 }  // namespace
 
 namespace render {
@@ -275,32 +258,34 @@ void portal(const char* apSsid, const char* apPass, const char* url) {
 
   // A plain "Setup" title. This screen is the one a stranger is most likely to
   // be reading, so it says what it is in words.
-  int y = INNER_Y + 2;
   t.setTextDatum(TC_DATUM);
   t.setTextColor(COL_TEXT, COL_BG);
-  t.drawString("Setup", SCREEN_W / 2, y + 8, 4);
-  y += 44;
+  t.drawString("Setup", SCREEN_W / 2, INNER_Y + PORTAL_TITLE_DY, 4);
+
+  // The body's vertical rhythm is per board (PORTAL_* in layout.h): the 2.8"
+  // panel fits the same seven lines into 80 px less height.
+  const int y = INNER_Y + PORTAL_BODY_DY;
 
   t.setTextDatum(TC_DATUM);
   t.setTextColor(COL_DIM, COL_BG);
   t.drawString("Join this WiFi network from your phone", SCREEN_W / 2, y, 2);
 
   t.setTextColor(COL_TEXT, COL_BG);
-  t.drawString(apSsid, SCREEN_W / 2, y + 22, 4);
+  t.drawString(apSsid, SCREEN_W / 2, y + PORTAL_SSID_DY, 4);
 
   t.setTextColor(COL_DIM, COL_BG);
-  t.drawString("password", SCREEN_W / 2, y + 58, 2);
+  t.drawString("password", SCREEN_W / 2, y + PORTAL_PASSLBL_DY, 2);
   t.setTextColor(COL_TEXT, COL_BG);
-  t.drawString(apPass, SCREEN_W / 2, y + 78, 4);
+  t.drawString(apPass, SCREEN_W / 2, y + PORTAL_PASS_DY, 4);
 
   t.setTextColor(COL_DIM, COL_BG);
-  t.drawString("then open", SCREEN_W / 2, y + 114, 2);
+  t.drawString("then open", SCREEN_W / 2, y + PORTAL_OPENLBL_DY, 2);
   t.setTextColor(COL_SCHED, COL_BG);
-  t.drawString(url, SCREEN_W / 2, y + 134, 4);
+  t.drawString(url, SCREEN_W / 2, y + PORTAL_URL_DY, 4);
 
   t.setTextColor(COL_DIM, COL_BG);
   t.drawString("Hold BOOT at power-on to return here later",
-               SCREEN_W / 2, INNER_Y + INNER_H - 24, 2);
+               SCREEN_W / 2, INNER_Y + INNER_H - PORTAL_FOOTER_UP, 2);
 }
 
 void splash(const char* detail) {
@@ -420,26 +405,46 @@ void board(const BoardModel& model, const char* originName, const char* destName
   // previous render, so sizing it to a narrow value would leave a sliver of a
   // wider predecessor. It also keeps the route's available width constant, so
   // the header does not reflow as the digits change.
-  const int clockW = t.textWidth("88:88", FONT_MED);
-  const int routeMaxW = INNER_W - clockW - 24;
+  const int clockW = t.textWidth("88:88", CLOCK_FONT);
+  const int routeMaxW = INNER_W - clockW - ROUTE_CLOCK_GAP;
 
   if (changed(g_cache.clock, sizeof(g_cache.clock), clockStr)) {
     t.setTextDatum(TR_DATUM);
     t.setTextColor(COL_TEXT, COL_BG);
-    t.setTextPadding(clockW + 8);
-    t.drawString(clockStr, COL_RIGHT, INNER_Y + 6, FONT_MED);
+    t.setTextPadding(clockW + CLOCK_PAD_EXTRA);
+    t.drawString(clockStr, COL_RIGHT, INNER_Y + CLOCK_DY, CLOCK_FONT);
   }
 
+  const char* origin = headerName(originName);
+  const char* dest = headerName(destName);
   char header[48];
-  snprintf(header, sizeof(header), "%s  >  %s", originName, destName);
+  snprintf(header, sizeof(header), "%s  >  %s", origin, dest);
   if (changed(g_cache.header, sizeof(g_cache.header), header)) {
-    const uint8_t f = fontThatFits(header, routeMaxW, FONT_MED, FONT_SMALL);
+    const uint8_t f = fontThatFits(header, routeMaxW, ROUTE_FONT_BIG, FONT_SMALL);
     t.setTextDatum(TL_DATUM);
     t.setTextColor(COL_TEXT, COL_BG);
     t.setTextPadding(routeMaxW);
-    // Same top edge as the clock at the matching size; nudged down when the
-    // fallback font is shorter so the two stay optically level.
-    t.drawString(header, INNER_X + 4, INNER_Y + (f == FONT_MED ? 6 : 11), f);
+    if (ROUTE_WRAP) {
+      // Clear the whole route strip by rectangle on every change. A one-line
+      // route and a two-line route occupy different rows, and padding only
+      // repaints the row being drawn, so switching between them would leave
+      // the old text behind. The strip stops above the note row (NOTE_DY) and
+      // left of the clock's padding, so neither is disturbed.
+      t.fillRect(INNER_X + 4, INNER_Y, routeMaxW, NOTE_DY, COL_BG);
+    }
+    if (ROUTE_WRAP && t.textWidth(header, f) > routeMaxW) {
+      // Too wide for one line even in the small font — on the 2.8", 6 of the
+      // 870 station pairs: origin on the first line, "> destination" under it.
+      char second[40];
+      snprintf(second, sizeof(second), "> %s", dest);
+      t.drawString(origin, INNER_X + 4, INNER_Y + ROUTE_LINE1_DY, FONT_SMALL);
+      t.drawString(second, INNER_X + 4, INNER_Y + ROUTE_LINE2_DY, FONT_SMALL);
+    } else {
+      // Same top edge as the clock at the matching size; nudged down when the
+      // fallback font is shorter so the two stay optically level.
+      t.drawString(header, INNER_X + 4,
+                   INNER_Y + (f == FONT_MED ? ROUTE_BIG_DY : ROUTE_SMALL_DY), f);
+    }
   }
 
   // Data provenance. A board built from flash must never pass for a live one.
@@ -473,14 +478,14 @@ void board(const BoardModel& model, const char* originName, const char* destName
       t.setTextDatum(TL_DATUM);
       t.setTextColor(COL_SCHED, COL_BG);
       t.setTextPadding(INNER_W - 8);
-      t.drawString(note, INNER_X + 4, INNER_Y + 34, FONT_SMALL);
+      t.drawString(note, INNER_X + 4, INNER_Y + NOTE_DY, FONT_SMALL);
     } else {
       // An empty string cannot erase this field the way it does the others.
       // Padding is what repaints the old text, and TFT_eSPI skips the padding
       // fill when the text and background colours are equal — which is exactly
       // the case when clearing. The note would otherwise stay on screen until
       // the next full repaint. Clear the strip directly instead.
-      t.fillRect(INNER_X + 4, INNER_Y + 34, INNER_W - 8,
+      t.fillRect(INNER_X + 4, INNER_Y + NOTE_DY, INNER_W - 8,
                  t.fontHeight(FONT_SMALL), COL_BG);
     }
   }
@@ -528,20 +533,22 @@ void board(const BoardModel& model, const char* originName, const char* destName
       delay[0] = '\0';
     }
 
-    // Big countdown. Font 6 covers digits only, which is all this is.
+    // The countdown: font 6 on the 3.5" (digits only, which is all this is),
+    // font 4 on the time line on the 2.8" (COUNT_FONT and COUNT_DY, layout.h).
     if (changed(g_cache.mins[i], sizeof(g_cache.mins[i]), mins) ||
         g_cache.minsColour[i] != minsColour) {
       g_cache.minsColour[i] = minsColour;
       t.setTextDatum(MR_DATUM);
       t.setTextColor(minsColour, COL_BG);
-      t.setTextPadding(100);
-      t.drawString(mins, COL_MIN_R, y + ROW_H / 2 - 2, FONT_BIG);
+      t.setTextPadding(COUNT_PAD);
+      t.drawString(mins, COL_MIN_R, y + COUNT_DY, COUNT_FONT);
 
       // The unit label only makes sense next to a number.
       t.setTextDatum(TL_DATUM);
       t.setTextColor(COL_DIM, COL_BG);
-      t.setTextPadding(34);
-      t.drawString(mins[0] ? "min" : "", COL_MIN_R + 6, y + ROW_H / 2 + 4, FONT_SMALL);
+      t.setTextPadding(MIN_LABEL_PAD);
+      t.drawString(mins[0] ? "min" : "", COL_MIN_R + MIN_LABEL_DX, y + MIN_LABEL_DY,
+                   FONT_SMALL);
     }
 
     // Departure time on the left, status on the right, sharing a line at the
@@ -550,8 +557,8 @@ void board(const BoardModel& model, const char* originName, const char* destName
     if (changed(g_cache.when[i], sizeof(g_cache.when[i]), when)) {
       t.setTextDatum(ML_DATUM);
       t.setTextColor(COL_TEXT, COL_BG);
-      t.setTextPadding(110);
-      t.drawString(when, COL_INFO, y + 28, FONT_MED);
+      t.setTextPadding(WHEN_PAD);
+      t.drawString(when, COL_INFO, y + WHEN_DY, FONT_MED);
     }
 
     if (changed(g_cache.delay[i], sizeof(g_cache.delay[i]), delay)) {
@@ -562,15 +569,15 @@ void board(const BoardModel& model, const char* originName, const char* destName
       t.setTextColor(c, COL_BG);
       // Padding sized for the longest status this can produce ("+99 late"),
       // not the current one, so a shorter value fully erases a longer one.
-      t.setTextPadding(t.textWidth("+99 late", FONT_MED) + 10);
-      t.drawString(delay, COL_RIGHT, y + 28, FONT_MED);
+      t.setTextPadding(t.textWidth("+99 late", ROW_STATUS_FONT) + 10);
+      t.drawString(delay, COL_RIGHT, y + WHEN_DY, ROW_STATUS_FONT);
     }
 
     if (changed(g_cache.info[i], sizeof(g_cache.info[i]), info)) {
       t.setTextDatum(ML_DATUM);
       t.setTextColor(COL_DIM, COL_BG);
-      t.setTextPadding(INNER_W - (COL_INFO - INNER_X) - 8);
-      t.drawString(info, COL_INFO, y + 60, FONT_SMALL);
+      t.setTextPadding(INNER_W - (COL_INFO - INNER_X) - INFO_PAD_INSET);
+      t.drawString(info, COL_INFO, y + INFO_DY, FONT_SMALL);
     }
   }
   t.setTextPadding(0);
@@ -584,7 +591,7 @@ void overnight(const char* originName, const char* destName, bool have,
   drawBorder(COL_RULE);
 
   char header[48];
-  snprintf(header, sizeof(header), "%s  >  %s", originName, destName);
+  snprintf(header, sizeof(header), "%s  >  %s", headerName(originName), headerName(destName));
   if (changed(g_cache.header, sizeof(g_cache.header), header)) {
     t.setTextDatum(TC_DATUM);
     t.setTextColor(COL_DIM, COL_BG);
@@ -610,14 +617,14 @@ void overnight(const char* originName, const char* destName, bool have,
       t.setTextDatum(TC_DATUM);
       t.setTextColor(COL_SCHED, COL_BG);
       t.setTextPadding(INNER_W);
-      t.drawString(expiredNote, SCREEN_W / 2, INNER_Y + 34, FONT_SMALL);
+      t.drawString(expiredNote, SCREEN_W / 2, INNER_Y + NOTE_DY, FONT_SMALL);
     } else {
       // Same reason as board()'s note: TFT_eSPI's padding fill is skipped
       // when text colour equals background colour, so an empty drawString
       // here would silently leave the old warning's pixels on screen. This
       // shipped as a real bug on this project before (see board()); fillRect
       // instead of trusting padding to erase it.
-      t.fillRect(INNER_X, INNER_Y + 34, INNER_W, t.fontHeight(FONT_SMALL), COL_BG);
+      t.fillRect(INNER_X, INNER_Y + NOTE_DY, INNER_W, t.fontHeight(FONT_SMALL), COL_BG);
     }
   }
 
@@ -639,10 +646,19 @@ void overnight(const char* originName, const char* destName, bool have,
     snprintf(detail, sizeof(detail), "No service %s on this route", tomorrowLabel);
   }
   if (changed(g_cache.info[0], sizeof(g_cache.info[0]), detail)) {
+    // Medium font when it fits, small when it does not: "First Wednesday
+    // 05:12  #101" is 332 px in font 4, wider than the 2.8" panel. Nothing
+    // main.cpp passes here is too wide for the 3.5", so that board still draws
+    // font 4. The band is cleared first because padding only erases the NEW
+    // font's height — a small line replacing a medium one would leave the old
+    // line's top and bottom edges on screen.
+    const uint8_t df = fontThatFits(detail, INNER_W - 8, FONT_MED, FONT_SMALL);
+    t.fillRect(INNER_X, SCREEN_H / 2 + 20 - t.fontHeight(FONT_MED) / 2, INNER_W,
+               t.fontHeight(FONT_MED), COL_BG);
     t.setTextDatum(MC_DATUM);
     t.setTextColor(have ? COL_SCHED : COL_DIM, COL_BG);
     t.setTextPadding(INNER_W);
-    t.drawString(detail, SCREEN_W / 2, SCREEN_H / 2 + 20, 4);
+    t.drawString(detail, SCREEN_W / 2, SCREEN_H / 2 + 20, df);
   }
   t.setTextPadding(0);
 }

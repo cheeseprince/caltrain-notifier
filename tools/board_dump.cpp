@@ -61,7 +61,11 @@ int main(int argc, char** argv) {
   const uint8_t service = serviceForDate(
       (mid.tm_year + 1900) * 10000 + (mid.tm_mon + 1) * 100 + mid.tm_mday, mid.tm_wday);
 
-  const BoardModel m = buildBoard(live, originIdx, destIdx, service, nowEpoch, dayStart);
+  // The shipped red/yellow urgency defaults (src/urgency.h). A device can be
+  // set otherwise in the setup portal; the screenshot shows what a fresh sign
+  // does, the same defaults gen_screenshot.py's legend documents.
+  const BoardModel m = buildBoard(live, originIdx, destIdx, service, nowEpoch, dayStart,
+                                  kUrgencyDefaults);
 
   char clockStr[8];
   strftime(clockStr, sizeof(clockStr), "%H:%M", &lt);
