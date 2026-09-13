@@ -5,6 +5,7 @@
 #   ./tools/mac_flash.sh bringup      # same, explicitly
 #   ./tools/mac_flash.sh firmware     # flash the real firmware
 #   ./tools/mac_flash.sh bringup v20  # force the other board revision
+#   ./tools/mac_flash.sh firmware es3c28p  # the QDtech ES3C28P 2.8" board
 #   ./tools/mac_flash.sh monitor      # just open the serial monitor
 #
 # PlatformIO is installed into a virtualenv under .venv-pio rather than into the
@@ -16,7 +17,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 TARGET="${1:-bringup}"
-REV="${2:-v22}"          # this unit is v2.2; v20 swaps TFT_MISO and TOUCH_CS
+REV="${2:-v22}"          # CrowPanel v2.2; v20 swaps TFT_MISO and TOUCH_CS; es3c28p is the 2.8" board
 VENV="$ROOT/.venv-pio"
 PIO="$VENV/bin/pio"
 
@@ -53,13 +54,14 @@ say "PlatformIO $("$PIO" --version | awk '{print $NF}')"
 # ---------------------------------------------------------------------------
 # 2. Find the board
 # ---------------------------------------------------------------------------
-# This board uses a CP210x or CH340 USB-UART bridge, not native USB, so macOS
+# The CrowPanel uses a CP210x or CH340 USB-UART bridge, not native USB, so macOS
 # needs a driver for it. Recent macOS ships a CP210x driver; CH340 usually does
-# not and needs the WCH one. Always prefer the cu.* device: opening tty.* blocks
-# waiting for carrier detect and simply hangs.
+# not and needs the WCH one. The ES3C28P's ESP32-S3 has native USB and appears
+# as cu.usbmodem* with no driver at all. Always prefer the cu.* device: opening
+# tty.* blocks waiting for carrier detect and simply hangs.
 find_port() {
     local p
-    for p in /dev/cu.usbserial-* /dev/cu.SLAB_USBtoUART* /dev/cu.wchusbserial*; do
+    for p in /dev/cu.usbserial-* /dev/cu.SLAB_USBtoUART* /dev/cu.wchusbserial* /dev/cu.usbmodem*; do
         [[ -e "$p" ]] && { echo "$p"; return 0; }
     done
     return 1
@@ -68,7 +70,7 @@ find_port() {
 if ! PORT="$(find_port)"; then
     die "No USB serial device found.
 
-Checked /dev/cu.usbserial-*, /dev/cu.SLAB_USBtoUART*, /dev/cu.wchusbserial*
+Checked /dev/cu.usbserial-*, /dev/cu.SLAB_USBtoUART*, /dev/cu.wchusbserial*, /dev/cu.usbmodem*
 
   - Is the board plugged in, with a DATA cable rather than a charge-only one?
   - CH340 boards need the WCH driver: https://www.wch-ic.com/downloads/CH341SER_MAC_ZIP.html
@@ -81,14 +83,25 @@ say "Board on $PORT"
 # ---------------------------------------------------------------------------
 case "$TARGET" in
     bringup)
+        [[ "$REV" == "es3c28p" ]] && die "bringup/ is a CrowPanel smoke test. For the ES3C28P, flash the firmware: ./tools/mac_flash.sh firmware es3c28p"
         PROJECT_DIR="$ROOT/bringup"
-        ENV_NAME=$([[ "$REV" == "v20" ]] && echo "bringup" || echo "bringup_v22")
+        case "$REV" in
+            v20) ENV_NAME="bringup" ;;
+            v22) ENV_NAME="bringup_v22" ;;
+            *)   die "Unknown board '$REV'. Use: v22 | v20" ;;
+        esac
         ;;
     firmware)
-        # Revision-specific again: tap-to-wake reads the touch controller, which
-        # needs the two pins that v2.0 and v2.2 swap.
+        # Board-specific: tap-to-wake reads the touch controller, which on the
+        # CrowPanel needs the two pins v2.0 and v2.2 swap, and on the ES3C28P
+        # is a different controller altogether.
         PROJECT_DIR="$ROOT"
-        ENV_NAME=$([[ "$REV" == "v20" ]] && echo "caltrain_v20" || echo "caltrain")
+        case "$REV" in
+            v22)     ENV_NAME="caltrain" ;;
+            v20)     ENV_NAME="caltrain_v20" ;;
+            es3c28p) ENV_NAME="caltrain_es3c28p" ;;
+            *)       die "Unknown board '$REV'. Use: v22 | v20 | es3c28p" ;;
+        esac
         ;;
     monitor)
         say "Opening serial monitor on $PORT — Ctrl-C to exit"

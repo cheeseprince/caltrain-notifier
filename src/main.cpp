@@ -1,7 +1,10 @@
 // Caltrain Notifier — next departures on a desk sign.
 //
-// Elecrow CrowPanel 3.5" (ILI9488 480x320 SPI). No touch: setup happens from a
-// phone over a captive portal, and holding BOOT at power-on returns to it.
+// Runs on either supported panel (platformio.ini's env list; per-board
+// geometry in src/layout.h). Setup happens from a phone over a captive
+// portal on every board, and holding BOOT at power-on returns to it. Where a
+// board has touch (display_hw.h), it only wakes the screen — it is never
+// used to navigate setup.
 //
 // SHAPE OF THE LOOP
 //   fetch   every POLL_INTERVAL_MS, well inside 511's 60-requests-per-hour cap
@@ -254,9 +257,10 @@ void wakeScreen(const char* why) {
 // Two ways to wake the screen, both edge-detected so that holding a finger or
 // the button down does not retrigger every loop.
 //
-// The tap is the everyday one. BOOT is the backstop: resistive touch on this
-// panel is the least reliable thing on the board, and a sign that cannot be
-// lit has no way to tell you why.
+// The tap is the everyday one. BOOT is the backstop: touch reliability varies
+// by board (resistive XPT2046 on the CrowPanel, capacitive FT6336G on the
+// ES3C28P — see display_hw.cpp), and a sign that cannot be lit has no way to
+// tell you why.
 void pollWake() {
   const bool tap = display::touched();
   if (tap && !g_tapWasDown) wakeScreen("tap");

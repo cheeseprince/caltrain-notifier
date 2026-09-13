@@ -433,8 +433,9 @@ void board(const BoardModel& model, const char* originName, const char* destName
       t.fillRect(INNER_X + 4, INNER_Y, routeMaxW, NOTE_DY, COL_BG);
     }
     if (ROUTE_WRAP && t.textWidth(header, f) > routeMaxW) {
-      // Too wide for one line even in the small font — on the 2.8", 6 of the
-      // 870 station pairs: origin on the first line, "> destination" under it.
+      // Too wide for one line even in the small font — on the 2.8", 4 of the
+      // 870 station pairs with full names (none with the short names): origin
+      // on the first line, "> destination" under it.
       char second[40];
       snprintf(second, sizeof(second), "> %s", dest);
       t.drawString(origin, INNER_X + 4, INNER_Y + ROUTE_LINE1_DY, FONT_SMALL);
@@ -646,10 +647,11 @@ void overnight(const char* originName, const char* destName, bool have,
     snprintf(detail, sizeof(detail), "No service %s on this route", tomorrowLabel);
   }
   if (changed(g_cache.info[0], sizeof(g_cache.info[0]), detail)) {
-    // Medium font when it fits, small when it does not: "First Wednesday
-    // 05:12  #101" is 332 px in font 4, wider than the 2.8" panel. Nothing
-    // main.cpp passes here is too wide for the 3.5", so that board still draws
-    // font 4. The band is cleared first because padding only erases the NEW
+    // Medium font when it fits, small when it does not: main.cpp passes
+    // "tomorrow" here, not a weekday name, and "First tomorrow  05:12  #101"
+    // is 305 px in font 4, wider than the 2.8" panel. Nothing main.cpp passes
+    // here is too wide for the 3.5", so that board still draws font 4. The
+    // band is cleared first because padding only erases the NEW
     // font's height — a small line replacing a medium one would leave the old
     // line's top and bottom edges on screen.
     const uint8_t df = fontThatFits(detail, INNER_W - 8, FONT_MED, FONT_SMALL);

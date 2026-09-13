@@ -90,12 +90,16 @@ jobs:
           build-mode: manual
           config-file: ./.github/codeql/codeql-config.yml
 
-      # The real firmware build. Only one environment is built (not the
-      # caltrain_v20 counterpart from ci.yml): the two environments differ
-      # only in two pin definitions (TFT_MISO/TOUCH_CS), so they compile the
-      # same source lines and would not add coverage, only CI time.
+      # The real firmware builds. caltrain_v20 is not built here (ci.yml builds
+      # it): it differs from caltrain only in two pin definitions
+      # (TFT_MISO/TOUCH_CS), so it compiles the same source lines and would add
+      # CI time, not coverage. caltrain_es3c28p IS built: its FT6336G touch
+      # driver and 2.8" layout are source lines no other environment compiles.
       - name: Build firmware (caltrain environment)
         run: pio run -e caltrain
+
+      - name: Build firmware (caltrain_es3c28p environment)
+        run: pio run -e caltrain_es3c28p
 
       - name: Analyze
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4.37.9

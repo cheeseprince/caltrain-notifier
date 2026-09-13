@@ -109,8 +109,8 @@ def _active_lines(text, defined=()):
     TFT_eSPI's Font16.c puts an `#ifdef TFT_ESPI_GRAVE_IS_DEGREE` block INSIDE
     its width table. Reading both branches yields 104 entries instead of 96 and
     shifts every glyph from 'h' on — which silently corrupted this script's
-    measurements once. This firmware does not define that symbol, so the #else
-    branch is the one actually compiled.
+    measurements once. Which branch is compiled depends on `defined`: the
+    symbols the font file #defines for itself (TftFonts._file_defines).
     """
     stack = []
     for line in text.splitlines():
@@ -141,9 +141,9 @@ def _c_body(src, name):
     return src[start:src.index("}", start)]
 
 
-def _c_numbers(src, name):
+def _c_numbers(src, name, defined=()):
     """The integer literals (decimal or hex) of a C array, preprocessor-aware."""
-    body = "\n".join(_active_lines(_c_body(src, name)))
+    body = "\n".join(_active_lines(_c_body(src, name), defined))
     body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
     body = re.sub(r"//[^\n]*", "", body)
     return [int(tok, 0) for tok in re.findall(r"0[xX][0-9a-fA-F]+|\d+", body)]
@@ -156,18 +156,43 @@ class TftFonts:
 
     def __init__(self, fonts_dir):
         self.widths, self.height = {}, {}
-        self._src, self._names, self._glyphs = {}, {}, {}
+        self._src, self._names, self._glyphs, self._defined = {}, {}, {}, {}
         for font, (base, tag) in self.FILES.items():
             header = open(os.path.join(fonts_dir, base + ".h"), encoding="utf-8").read()
             src = open(os.path.join(fonts_dir, base + ".c"), encoding="utf-8").read()
+            defined = self._file_defines(src)
             self.height[font] = int(re.search(rf"#define\s+chr_hgt_{tag}\s+(\d+)", header).group(1))
-            self.widths[font] = _c_numbers(src, f"widtbl_{tag}")
-            table = "\n".join(_active_lines(_c_body(src, f"chrtbl_{tag}")))
+            self.widths[font] = _c_numbers(src, f"widtbl_{tag}", defined)
+            table = "\n".join(_active_lines(_c_body(src, f"chrtbl_{tag}"), defined))
             self._names[font] = re.findall(rf"\bchr_{tag}_[0-9A-Fa-f]+\b", table)
             if len(self.widths[font]) != 96 or len(self._names[font]) != 96:
                 raise ValueError(f"{base}.c: expected 96 widths and 96 glyphs, got "
                                  f"{len(self.widths[font])} and {len(self._names[font])}")
             self._src[font] = src
+            self._defined[font] = defined
+
+    @staticmethod
+    def _file_defines(src):
+        """Symbols a font file #defines for itself, unconditionally.
+
+        Font16.c switches on TFT_ESPI_FONT2_DOLLAR and TFT_ESPI_GRAVE_IS_DEGREE in
+        its own first lines, so those #ifdef branches are the ones compiled into
+        the firmware ('`' is a 5 px degree sign); Font32rle.c leaves FONT_4_GBP
+        commented out. Only uncommented, value-less #define lines outside any #if
+        block count.
+        """
+        defined, depth = set(), 0
+        for line in src.splitlines():
+            s = line.strip()
+            if s.startswith(("#ifdef", "#ifndef", "#if ")):
+                depth += 1
+            elif s.startswith("#endif"):
+                depth -= 1
+            elif depth == 0:
+                m = re.fullmatch(r"#define\s+(\w+)", s)
+                if m:
+                    defined.add(m.group(1))
+        return defined
 
     def glyph(self, font, code):
         """(x, y) pixel offsets of character `code` (32..127), lit in the text colour."""
@@ -175,7 +200,7 @@ class TftFonts:
         if key not in self._glyphs:
             index = code - 32
             width, height = self.widths[font][index], self.height[font]
-            data = _c_numbers(self._src[font], self._names[font][index])
+            data = _c_numbers(self._src[font], self._names[font][index], self._defined[font])
             self._glyphs[key] = (self._decode_bitmap if font == 2 else self._decode_rle)(
                 data, width, height)
         return self._glyphs[key]

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# publish_ota.sh — local fallback: build both board revisions, sign the
+# publish_ota.sh — local fallback: build every board, sign the
 # manifest, and publish an OTA release to gh-pages without going through CI.
 #
 # Releases live on this repo's `gh-pages` branch, served by GitHub Pages at
-# OTA_BASE_URL (platformio.ini's [base] section). Once a day, ota_task.cpp
+# OTA_BASE_URL (platformio.ini's [flags] section). Once a day, ota_task.cpp
 # fetches manifest.txt from there, verifies its signature against the key
 # compiled into the running firmware (src/ota_pubkey.h), and self-updates
 # over WiFi if it verifies and names a newer version for this board revision.
@@ -26,7 +26,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ENVS=(caltrain caltrain_v20)
+ENVS=(caltrain caltrain_v20 caltrain_es3c28p)
 PAGES_BRANCH="gh-pages"
 REMOTE_URL="$(git remote get-url origin)"
 KEYFILE="${OTA_SIGNING_KEY_FILE:-$HOME/caltrain-ota-signing-key.pem}"
@@ -65,9 +65,9 @@ sed -i "s/#define FW_VERSION \".*\"/#define FW_VERSION \"$VERSION\"/" src/fw_ver
 TMP=$(mktemp -d)
 trap 'git checkout -q -- src/fw_version.h; rm -rf "$TMP"; git worktree prune' EXIT
 
-# --- Build both board revisions. Every release must carry both, or a v2.0 --
-# unit can never update (src/ota_manifest.h: environment matching is exact,
-# with no fallback from one name to another).
+# --- Build every board. A release missing any one leaves that board unable --
+# to ever update (src/ota_manifest.h: environment matching is exact, with no
+# fallback from one name to another).
 for e in "${ENVS[@]}"; do
   echo "== building $e"
   pio run -e "$e" >/dev/null

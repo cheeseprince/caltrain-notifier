@@ -310,7 +310,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        environment: [caltrain, caltrain_v20]
+        environment: [caltrain, caltrain_v20, caltrain_es3c28p]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
@@ -331,8 +331,10 @@ jobs:
       # for how it was generated and how to regenerate it on a version bump.
       - name: Install PlatformIO
         run: pip install --require-hashes -r requirements.txt
-      # Both board revisions build. They differ only in TOUCH_CS/TFT_MISO, which
-      # is exactly the kind of difference that compiles on one and not the other.
+      # Every board builds. The two CrowPanel revisions differ only in
+      # TOUCH_CS/TFT_MISO, which is exactly the kind of difference that compiles
+      # on one and not the other; caltrain_es3c28p is a different chip, panel,
+      # layout and touch driver entirely.
       - name: Build ${{ matrix.environment }}
         run: pio run -e ${{ matrix.environment }}
 

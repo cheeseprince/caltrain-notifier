@@ -47,7 +47,7 @@ inline constexpr const char* kSplashAttributionWide[] = {
     "Live data: 511 SF Bay   Schedule: Caltrain GTFS",
     "This firmware: MIT licensed, no warranty.",
 };
-// Widest line 278 px of the 2.8" panel's 300.
+// Widest line 275 px of the 2.8" panel's 300.
 inline constexpr const char* kSplashAttributionNarrow[] = {
     "Not affiliated with, endorsed by, or",
     "sponsored by Caltrain or the Peninsula",

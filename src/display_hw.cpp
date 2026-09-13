@@ -88,8 +88,14 @@ namespace display {
 void begin() {
   // Backlight first, and dark, so the panel's power-on noise is never shown.
   // It is raised once the first frame has been drawn.
+  //
+  // Attached to BACKLIGHT_PIN, not TFT_BL: if TFT_eSPI ever saw a TFT_BL
+  // definition, its init() below would call pinMode() on that pin and detach
+  // this LEDC channel right back off it, silently turning it back into a
+  // plain GPIO and making every ledcWrite() below a no-op (confirmed on the
+  // ES3C28P by register read, 2026-09-12 — see platformio.ini).
   ledcSetup(BL_CHANNEL, BL_FREQ_HZ, BL_RESOLUTION);
-  ledcAttachPin(TFT_BL, BL_CHANNEL);
+  ledcAttachPin(BACKLIGHT_PIN, BL_CHANNEL);
   ledcWrite(BL_CHANNEL, 0);
 
   g_tft.init();

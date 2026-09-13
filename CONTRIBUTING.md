@@ -11,9 +11,10 @@ sit until there is time for it.
 Open a [GitHub Issue](https://github.com/cheeseprince/caltrain-notifier/issues).
 A report that can actually be acted on includes:
 
-- **Which board revision you're on — v2.0 or v2.2.** The two swap `TFT_MISO`
-  and `TOUCH_CS`, they build from different PlatformIO environments
-  (`caltrain` vs `caltrain_v20`), and a bug specific to one revision is
+- **Which board you're on — CrowPanel 3.5" v2.0 or v2.2, or the QDtech
+  ES3C28P 2.8".** The two CrowPanel revisions swap `TFT_MISO` and `TOUCH_CS`,
+  all three build from different PlatformIO environments (`caltrain`,
+  `caltrain_v20`, `caltrain_es3c28p`), and a bug specific to one board is
   unreproducible without knowing which. See the README's
   [Board revisions](README.md#board-revisions-matter--build-the-one-that-matches-your-unit)
   section if you're not sure which you have.
@@ -78,6 +79,7 @@ Straight from the README, so they can't drift out of sync with it:
 cd test && make       # host tests — no board, no network
 pio run -e caltrain        # device build, board revision 2.2
 pio run -e caltrain_v20    # device build, board revision 2.0
+pio run -e caltrain_es3c28p  # device build, QDtech ES3C28P 2.8"
 ```
 
 ## Coding conventions
@@ -100,8 +102,9 @@ pio run -e caltrain_v20    # device build, board revision 2.0
 
 ## What CI checks
 
-Every push and pull request runs six required jobs
+Every push and pull request runs seven required jobs
 (`.github/workflows/ci.yml`): a checksum-pinned secret scan, timetable
-freshness, the host test suite, a device build for each board revision
-(`caltrain` and `caltrain_v20`), and a bounded fuzz smoke test against
-`siri_parse.cpp`. A pull request cannot merge until all six are green.
+freshness, the host test suite, a device build for each board
+(`caltrain`, `caltrain_v20` and `caltrain_es3c28p`), and a bounded fuzz smoke
+test against `siri_parse.cpp`. A pull request cannot merge until all seven are
+green.

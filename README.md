@@ -43,8 +43,9 @@ earlier build keeps 10 and 16, which is exactly the behaviour above.
 `0xFE60`, `0xF800`. The swatch above is generated from those same constants, so
 it cannot drift from what the panel lights up.*
 
-Built for an Elecrow CrowPanel 3.5" (ILI9488 480x320 SPI). Touch is used only to
-wake the screen — pressure, never coordinates, so there is nothing to calibrate.
+Built for an Elecrow CrowPanel 3.5" (ILI9488 480x320 SPI), and also runs on the
+QDtech ES3C28P 2.8" (ESP32-S3, 320x240). Touch is used only to wake the screen —
+never coordinates, so there is nothing to calibrate.
 Setup runs from a phone over a captive portal.
 
 ---
@@ -92,7 +93,7 @@ Full detail, including what each agency requires: **[ATTRIBUTION.md](ATTRIBUTION
 This project was built with substantial help from an AI coding assistant
 (Anthropic's Claude) — firmware, the generator tooling, the host tests, and this
 documentation. Every change is gated by CI: host tests under `-Werror`, device
-builds for both board revisions, and a checksum-pinned secret scan that
+builds for every supported board, and a checksum-pinned secret scan that
 self-tests against a generated probe before its result is trusted.
 
 Where the documentation states a fact about the 511 feed, that fact was measured
@@ -175,12 +176,56 @@ gone missing from the build flags and tap-to-wake is silently disabled.
 | `TFT_RST` | −1 (tied to the ESP32 reset line) |
 | `TFT_MISO` | **33** on v2.2, **12** on v2.0 — read back from the touch controller |
 | `TOUCH_CS` | **12** on v2.2, **33** on v2.0 |
-| `TFT_BL` | 27 — PWM-capable, which is what makes night dimming possible |
+| `BACKLIGHT_PIN` | 27 — PWM-capable, which is what makes night dimming possible |
 | BOOT button | 0 |
 
 The two revision-dependent pins are the whole reason there are two build
 environments; see [Board revisions](#board-revisions-matter--build-the-one-that-matches-your-unit)
 above.
+
+### Second board: QDtech ES3C28P 2.8"
+
+**Hosyond / QDtech ES3C28P** — ESP32-S3, 2.8" ILI9341V 320x240 IPS over SPI,
+FT6336G capacitive touch. One build environment:
+
+```bash
+pio run -e caltrain_es3c28p
+```
+
+- [Amazon — B0FKG7WRWV](https://www.amazon.com/dp/B0FKG7WRWV)
+- Manufacturer pin table, dimension drawing and STEP model:
+  [lcdwiki — 2.8inch ESP32-S3 Display](https://www.lcdwiki.com/2.8inch_ESP32-S3_Display_E32C28P/E32N28P)
+
+Read off the unit with `esptool.py flash_id`: ESP32-S3 (QFN56) rev v0.2,
+**16 MB quad flash, 8 MB octal PSRAM**. The S3's SDK configuration brings that
+PSRAM up at boot and adds it to the heap; nothing in this firmware relies on
+it, and `BOARD_HAS_PSRAM` stays undefined.
+
+Same firmware and features, laid out for the smaller panel (`src/layout.h`):
+three departures in 58 px rows with the countdown in the medium font beside the
+departure time, the delay status and the header clock in the small font, and a
+route header that shows "South San Francisco" and "California Avenue" as
+"S. San Francisco" and "California Ave" (`src/station_label.h`) so every station
+pair fits on one line. The setup portal keeps the full names.
+
+Touch is capacitive and read over I2C, not through TFT_eSPI, so this build prints
+TFT_eSPI's `TOUCH_CS pin not defined` warning. **On this board that warning is
+expected**; the `[TOUCH] FT6336 id=0x11` line at boot is what confirms
+tap-to-wake.
+
+| Signal | GPIO |
+| :--- | :--- |
+| `TFT_MOSI` / `TFT_SCLK` / `TFT_MISO` | 11 / 12 / 13 |
+| `TFT_CS` / `TFT_DC` | 10 / 46 |
+| `TFT_RST` | −1 (tied to the ESP32-S3 reset line) |
+| `BACKLIGHT_PIN` | 45 — active high, PWM |
+| Touch `SDA` / `SCL` / `RST` | 16 / 15 / 18 (FT6336G at I2C `0x38`; `INT` on 17 is unused) |
+| BOOT button | 0 |
+
+Bring-up on a real unit (2026-09-12) showed this IPS panel draws a negative
+without colour inversion, so `caltrain_es3c28p` sets `TFT_INVERSION_ON`. Rotation
+is the same landscape `setRotation(1)` as the CrowPanel, with the USB-C connector
+on the right.
 
 ---
 
@@ -231,6 +276,14 @@ system Python or Homebrew, and deleting the folder is a complete uninstall. It
 finds the `cu.*` serial port, builds, uploads, and opens the monitor.
 
 If upload fails to sync: hold **BOOT/IO0**, tap **EN/RST**, release BOOT, retry.
+
+For the ES3C28P, `./tools/mac_flash.sh firmware es3c28p`. Its ESP32-S3 has
+native USB, so on macOS it appears as `cu.usbmodem*` and on Linux as
+`/dev/ttyACM0`, with no driver:
+
+```bash
+pio run -e caltrain_es3c28p -t upload --upload-port /dev/ttyACM0
+```
 
 ### 4. Set it up from your phone
 
@@ -391,9 +444,9 @@ stayed on.
 git tag v1.2.0 && git push --tags
 ```
 
-That triggers `release.yml`, which builds **both** board revisions
-(`caltrain` and `caltrain_v20` — a release missing either one leaves that
-revision unable to ever update), signs the manifest with the
+That triggers `release.yml`, which builds **every** board (`caltrain`,
+`caltrain_v20` and `caltrain_es3c28p` — a release missing any one leaves that
+board unable to ever update), signs the manifest with the
 `OTA_SIGNING_KEY` repository secret, verifies that signature against the
 public key actually compiled into the firmware, and publishes the result to
 the `gh-pages` branch. `tools/publish_ota.sh` does the same thing from a
@@ -460,7 +513,9 @@ src/
   urgency.h         the red/yellow/green rule and its bounds         [pure]
   config.*          NVS settings; validation half is pure
   siri_client.*     HTTPS GET                                        [device]
-  display_hw.*      panel init, backlight PWM                        [device]
+  layout.h          per-board positions, fonts, splash text          [pure]
+  station_label.h   short station names for the 2.8" header         [pure]
+  display_hw.*      panel init, backlight PWM, touch                 [device]
   render.*          the screens                                      [device]
   portal.*          SoftAP captive portal                            [device]
   main.cpp          poll loop and 1 Hz tick
@@ -482,12 +537,13 @@ exercise the same parser the device runs rather than a lookalike.
 
 ### Footprint
 
-| | Used | Available |
+| | CrowPanel 3.5" | ES3C28P 2.8" |
 | :--- | :--- | :--- |
-| Flash | 1.12 MB | 3.34 MB app slot |
-| RAM | 57.6 KB | 320 KB |
+| Flash | 1.10 MB of 3.19 MB app slot | 1.06 MB of 6.25 MB app slot |
+| RAM | 61.9 KB of 320.0 KB | 60.7 KB of 320.0 KB |
 
-Two app slots plus 1.5 MB filesystem, so a signed-OTA path stays open.
+Two app slots on both — plus 1.5 MB filesystem on the CrowPanel's 8 MB layout,
+6.25 MB slots on the ES3C28P's 16 MB layout — so a signed-OTA path stays open.
 
 ---
 
@@ -497,7 +553,8 @@ Carried over from bringing this same board up for `obd-gauge-cluster`. Each cost
 real debugging time once already.
 
 - **Do not define `TFT_WIDTH`/`TFT_HEIGHT`.** `ILI9488_Defines.h` sets them to
-  portrait 320×480; the app uses its own `W=480 H=320` with `setRotation(1)`.
+  portrait 320×480; the app uses its own per-board `SCREEN_W`/`SCREEN_H` from
+  `src/layout.h` with a landscape rotation.
 - **Pin the platform.** A bare `espressif32` resolves to whatever is installed,
   and a global pioarduino install silently swaps the Arduino core 2.x → 3.x.
   That difference is invisible until something fails to compile — as
@@ -542,6 +599,25 @@ nearly shipped.
 - **`intelhex` is easy to have globally and not in a fresh venv.** Its absence
   makes `esptool` fail at flash time, not at build time, so a green build on the
   development machine proved nothing about the machine with the board attached.
+- **An ESP32-S3's `Serial` goes nowhere by default.** On Arduino core 2.0.17
+  `ARDUINO_USB_CDC_ON_BOOT` defaults to 0, which sends `Serial` to UART0 on
+  GPIO43/44 — the ES3C28P's USB-C port shows nothing at all. `caltrain_es3c28p`
+  sets it to 1.
+- **The ES3C28P's flash is quad and its PSRAM octal: `memory_type = qio_opi`.**
+  Guides for similar S3 boards often say `opi_opi`, which is for modules whose
+  flash is octal too. `esptool.py flash_id` reports "Flash type set in eFuse:
+  quad".
+- **GPIO45 and GPIO46 are strapping pins, and are not a problem here.** The
+  ES3C28P puts the backlight (45) and panel DC (46) on them, but this chip's
+  eFuse fixes the flash voltage ("Flash voltage set by eFuse to 3.3V") and the
+  board boots and enters download mode normally.
+- **TFT_eSPI takes the backlight pin back from the PWM.** With `TFT_BL` and
+  `TFT_BACKLIGHT_ON` defined, `TFT_eSPI::init()` calls `pinMode()` on the pin,
+  which turns an LEDC-driven pin back into a plain GPIO — so `ledcWrite()` did
+  nothing and night dimming never worked, on either board. Found by reading
+  GPIO45's output-select register on the ES3C28P: 256 (plain GPIO) before, 73
+  (LEDC channel 0) after. The backlight is now a separate `BACKLIGHT_PIN` flag
+  that TFT_eSPI never sees.
 
 ## Regenerating the screenshot
 
@@ -558,17 +634,31 @@ python3 tools/gen_screenshot.py --splash          # the boot screen
 python3 tools/gen_screenshot.py --legend          # the urgency swatch
 ```
 
-The splash renderer reads the attribution strings out of `src/render.cpp` rather
+The splash renderer reads the attribution strings out of `src/layout.h` rather
 than restating them, and warns if a line overruns the panel. Two copies of a
 legal notice drift apart, and the copy in the picture is the one people quote.
 
 `board_dump.cpp` is a printf around `buildBoard()` — it links the same modules
 the firmware does rather than reimplementing them, so the numbers are real. The
-geometry and the RGB565 colours in `gen_screenshot.py` are copied from
-`render.cpp`; the typeface is not, because TFT_eSPI's bitmap fonts are not
-distributable as a TTF, so DejaVu Sans stands in at the same pixel heights. An
-accurate diagram of a real board, then, rather than a photograph of one — and if
-`render.cpp`'s layout changes, `gen_screenshot.py` has to be changed with it.
+geometry in `gen_screenshot.py` is copied from `src/layout.h` and the RGB565
+colours from `render.cpp`. Text is drawn with TFT_eSPI's own glyphs, decoded from
+the font files a PlatformIO build fetches into `.pio/libdeps`, so after any
+`pio run` the image is the panel's pixels. Without a build it falls back to
+DejaVu Sans, which is noticeably wider, and prints a note saying so. If
+`layout.h` changes, `gen_screenshot.py` has to be changed with it.
+
+The committed images under `docs/images/` predate this pixel-accurate
+renderer; they are regenerated by running the commands above.
+
+The 2.8" ES3C28P layout renders the same way, as a preview into a directory of
+your choosing rather than `docs/images/`:
+
+```bash
+TZ=America/Los_Angeles /tmp/board_dump "San Francisco" "San Jose Diridon" \
+    test/fixtures/stopmonitoring_70012.json \
+    | python3 tools/gen_screenshot.py --board es3c28p --out /tmp/previews
+python3 tools/gen_screenshot.py --splash --board es3c28p --out /tmp/previews
+```
 
 Values in the generated header are readable RGB565 literals, so every push must
 be wrapped in `setSwapBytes(true)` with the previous value restored. Wrong
@@ -611,5 +701,5 @@ Security policy and known limitations: **[SECURITY.md](SECURITY.md)**.
 
 CI runs on every push and pull request: a checksum-pinned secret scan (which
 self-tests against a generated probe before it is trusted), the host suite, and
-a device build for both board revisions. See
+a device build for every supported board. See
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).

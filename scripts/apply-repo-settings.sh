@@ -63,7 +63,7 @@ gh api -X PATCH "repos/$REPO" -F security_and_analysis[secret_scanning][status]=
   && echo "   enabled" || echo "   SKIPPED - needs a public repository"
 
 echo "== branch protection on main (public repos only) =="
-# Required status checks are the four this project's CI actually produces. Names
+# Required status checks are the ones this project's CI actually produces. Names
 # must match the job names in .github/workflows/ci.yml exactly, including the
 # matrix suffix, or the check simply never becomes required and the gate is
 # decorative.
@@ -81,6 +81,7 @@ if gh api -X PUT "repos/$REPO/branches/main/protection" --input - >/dev/null 2>&
       "Host tests",
       "Device build (caltrain)",
       "Device build (caltrain_v20)",
+      "Device build (caltrain_es3c28p)",
       "Fuzz smoke test (siri_parse, ~90s, not a fuzzing campaign)"
     ]
   },

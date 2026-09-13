@@ -19,12 +19,13 @@
 #include "ota_verify.h"
 
 // OTA_ENV and OTA_BASE_URL are both build_flags in platformio.ini (see the
-// [env:caltrain] / [env:caltrain_v20] sections). OTA_ENV is set once per
-// environment — that is what stops a v2.0 board being handed a v2.2 image.
-// OTA_BASE_URL is set once, shared, in the [base] section (M2, whole-branch
-// review: it used to be duplicated per-env, which risked a channel move
-// landing on one environment but not the other) — either way it is a
-// build-time constant, not something fetched from anywhere that could be
+// [env:caltrain] / [env:caltrain_v20] / [env:caltrain_es3c28p] sections).
+// OTA_ENV is set once per environment — that is what stops a v2.0 board being
+// handed a v2.2 image, or either CrowPanel revision being handed the
+// ES3C28P's image. OTA_BASE_URL is set once, shared, in the [flags] section
+// (M2, whole-branch review: it used to be duplicated per-env, which risked a
+// channel move landing on one environment but not the other) — either way it
+// is a build-time constant, not something fetched from anywhere that could be
 // spoofed.
 
 namespace ota_task {

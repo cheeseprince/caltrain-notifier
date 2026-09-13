@@ -24,8 +24,9 @@ namespace display {
 // controller. Call once, early, after Serial.begin(): it logs.
 void begin();
 
-// 0..100 percent. Backed by LEDC on TFT_BL (GPIO27 on the CrowPanel, GPIO45 on
-// the ES3C28P). Both pins are dimmable, which is what makes night mode possible.
+// 0..100 percent. Backed by LEDC on BACKLIGHT_PIN (GPIO27 on the CrowPanel,
+// GPIO45 on the ES3C28P). Both pins are dimmable, which is what makes night
+// mode possible.
 void setBacklight(uint8_t pct);
 
 // Is the panel being pressed right now?

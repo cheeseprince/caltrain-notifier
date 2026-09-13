@@ -1,4 +1,4 @@
-# Release: build both board revisions, sign the manifest, publish to
+# Release: build every board, sign the manifest, publish to
 # gh-pages for devices to fetch over the air.
 #
 # Cut a release with:
@@ -121,14 +121,17 @@ jobs:
           sed -i "s/#define FW_VERSION \".*\"/#define FW_VERSION \"$VERSION\"/" src/fw_version.h
           grep -E '#define FW_(VERSION|GIT)' src/fw_version.h
 
-      # Both board revisions, always -- every release must carry both, or a
-      # v2.0 unit can never update (src/ota_manifest.h: matching is exact, no
+      # Every board, always -- a release missing any one leaves that board
+      # unable to ever update (src/ota_manifest.h: matching is exact, no
       # fallback from one environment name to another).
       - name: Build caltrain
         run: pio run -e caltrain
 
       - name: Build caltrain_v20
         run: pio run -e caltrain_v20
+
+      - name: Build caltrain_es3c28p
+        run: pio run -e caltrain_es3c28p
 
       # One manifest line per environment, in the EXACT format otaManifestFind()
       # parses (src/ota_manifest.cpp): "<env> <version> <sha256hex> <sizebytes>
@@ -139,7 +142,7 @@ jobs:
         run: |
           mkdir -p out
           : > out/manifest.txt
-          for e in caltrain caltrain_v20; do
+          for e in caltrain caltrain_v20 caltrain_es3c28p; do
             BIN=.pio/build/$e/firmware.bin
             SHA=$(sha256sum "$BIN" | cut -d' ' -f1)
             SIZE=$(stat -c%s "$BIN")
@@ -207,7 +210,7 @@ jobs:
           publish_dir: ./out
           keep_files: false
 
-      # The manual-run counterpart: the same four signed files, attached to
+      # The manual-run counterpart: the same five signed files, attached to
       # the run so they can be pulled down and USB-flashed onto a bench unit,
       # without ever touching gh-pages. Same pinned upload-artifact SHA as
       # ci.yml's fuzz corpus step.
@@ -222,7 +225,7 @@ jobs:
       # Everything above is genuinely published the moment it lands on
       # gh-pages, but only someone who already knows this project uses
       # gh-pages as its OTA channel can find it there. A GitHub Release
-      # makes the same four signed artifacts discoverable from the repo's
+      # makes the same five signed artifacts discoverable from the repo's
       # own Releases tab -- including for the README's USB recovery path
       # (`./tools/mac_flash.sh firmware`), which today just says "download
       # caltrain.bin" with no stable link to send anyone to.
@@ -236,10 +239,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NOTES=$(printf '%s\n\n%s\n\n%s\n' \
-            "Firmware $VERSION for both board revisions (\`caltrain\` = board v2.2, \`caltrain_v20\` = board v2.0)." \
+            "Firmware $VERSION for every supported board (\`caltrain\` = CrowPanel 3.5-inch v2.2, \`caltrain_v20\` = CrowPanel 3.5-inch v2.0, \`caltrain_es3c28p\` = QDtech ES3C28P 2.8-inch)." \
             "\`manifest.txt\` carries a detached ECDSA-P256/SHA-256 signature (\`manifest.sig\`), verified against the public key compiled into the firmware (\`src/ota_pubkey.h\`) before a device reads a single field of the manifest. There is no unsigned fallback: an absent, malformed, or invalid signature is refused outright -- see SECURITY.md." \
-            "These are the same four files just published to the \`gh-pages\` branch that devices fetch automatically during their daily OTA check. This Release exists so they can also be found without knowing \`gh-pages\` is the update channel.")
+            "These are the same five files just published to the \`gh-pages\` branch that devices fetch automatically during their daily OTA check. This Release exists so they can also be found without knowing \`gh-pages\` is the update channel.")
           gh release create "$GITHUB_REF_NAME" \
-            out/manifest.txt out/manifest.sig out/caltrain.bin out/caltrain_v20.bin \
+            out/manifest.txt out/manifest.sig out/caltrain.bin out/caltrain_v20.bin out/caltrain_es3c28p.bin \
             --title "$VERSION" \
             --notes "$NOTES"

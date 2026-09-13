@@ -1,10 +1,10 @@
 // station_label.h — short station names for a narrow route header.
 //
-// The 2.8" panel's route header sits beside the clock in 229 px of TFT_eSPI's
+// The 2.8" panel's route header sits beside the clock in 257 px of TFT_eSPI's
 // small font. Two station names are what push route pairs onto a second line,
 // so on that board the header uses a shorter form of them (layout.h,
-// SHORT_STATION_NAMES). Measured over all 870 ordered pairs: 858 fit on one
-// line with full names, 864 with these two short forms.
+// SHORT_STATION_NAMES). Measured over all 870 ordered pairs: 866 fit on one
+// line with full names, 870 of 870 with these two short forms.
 //
 // DISPLAY ONLY. stations.h is GENERATED from the GTFS feed and must not be
 // edited; the setup portal lists the full names; saved settings store station
