@@ -9,17 +9,23 @@
 A desk sign showing the next three Caltrain departures from your station toward
 your destination, with a border that turns yellow then red as the train nears.
 
-![The board, San Francisco to San Jose Diridon](docs/images/board-sf-to-diridon.png)
+![The board on the 3.5" CrowPanel, San Francisco to San Jose Diridon](docs/images/board-sf-to-diridon.png)
+
+The same firmware on the smaller 2.8" ES3C28P, laid out for its panel:
+
+![The board on the 2.8" ES3C28P, same trains](docs/images/board-es3c28p-sf-to-diridon.png)
 
 *Nine minutes to the 20:55 — close enough that the frame has gone red, while the
-two behind it are still green. Generated from the committed 511 capture by
-`tools/board_dump.cpp`, which links the same board-model, timetable and parser
-code the firmware runs, so the trains and countdowns are the ones the device
-would show. See [Regenerating the screenshot](#regenerating-the-screenshot).*
+two behind it are still green. Both images are generated from the committed 511
+capture by `tools/board_dump.cpp`, which links the same board-model, timetable
+and parser code the firmware runs, and drawn with the panel's own fonts — so the
+trains, countdowns and pixels are the ones the device would show. See
+[Regenerating the screenshots](#regenerating-the-screenshots).*
 
 Every boot shows who the data belongs to, and who this is not:
 
-![The boot splash, carrying the attribution and licence notice](docs/images/splash.png)
+![The boot splash on the 3.5", carrying the attribution and licence notice](docs/images/splash.png)
+![The same splash on the 2.8", rewrapped for the narrower panel](docs/images/splash-es3c28p.png)
 
 The whole point is that you do not have to read it. The border alone tells you
 whether to keep sitting down:
@@ -43,10 +49,10 @@ earlier build keeps 10 and 16, which is exactly the behaviour above.
 `0xFE60`, `0xF800`. The swatch above is generated from those same constants, so
 it cannot drift from what the panel lights up.*
 
-Built for an Elecrow CrowPanel 3.5" (ILI9488 480x320 SPI), and also runs on the
-QDtech ES3C28P 2.8" (ESP32-S3, 320x240). Touch is used only to wake the screen —
-never coordinates, so there is nothing to calibrate.
-Setup runs from a phone over a captive portal.
+Runs on two boards — the Elecrow CrowPanel 3.5" and the QDtech ES3C28P 2.8";
+see [Hardware](#hardware). Touch is used only to wake the screen — never
+coordinates, so there is nothing to calibrate. Setup runs from a phone over a
+captive portal.
 
 ---
 
@@ -88,23 +94,21 @@ does and does not affect.
 Full detail, including what each agency requires: **[ATTRIBUTION.md](ATTRIBUTION.md)**.
 
 
-## AI assistance
-
-This project was built with substantial help from an AI coding assistant
-(Anthropic's Claude) — firmware, the generator tooling, the host tests, and this
-documentation. Every change is gated by CI: host tests under `-Werror`, device
-builds for every supported board, and a checksum-pinned secret scan that
-self-tests against a generated probe before its result is trusted.
-
-Where the documentation states a fact about the 511 feed, that fact was measured
-against the live API with `tools/probe_511.py` and the response committed as a
-fixture — not inferred, and not taken from the vendor's description. When a
-re-measurement contradicted something already written down, the documentation
-changed: see the `RecordedAtTime` note in `src/siri_parse.h`, which records two
-disagreeing observations rather than the tidier claim that was there before.
-Nothing here is auto-generated and left unchecked.
-
 ## Hardware
+
+| | Elecrow CrowPanel 3.5" | QDtech ES3C28P 2.8" |
+| :--- | :--- | :--- |
+| Chip | ESP32-D0WD | ESP32-S3 |
+| Panel | ILI9488, 480x320, SPI | ILI9341V IPS, 320x240, SPI |
+| Touch (wake only) | XPT2046 resistive | FT6336G capacitive, I2C |
+| Flash / PSRAM | 8 MB / unconfirmed | 16 MB / 8 MB (unused) |
+| Build environment | `caltrain` (v2.2) or `caltrain_v20` (v2.0) | `caltrain_es3c28p` |
+| Amazon | [B0FXLB5CFL](https://www.amazon.com/dp/B0FXLB5CFL) | [B0FKG7WRWV](https://www.amazon.com/dp/B0FKG7WRWV) |
+
+Nothing else is needed for either — no enclosure, no extra sensors, and the
+USB-C cable that flashes the board also powers it.
+
+### Elecrow CrowPanel 3.5"
 
 **Elecrow CrowPanel 3.5" ESP32 HMI display** — ILI9488 480x320 SPI, XPT2046
 resistive touch. Roughly $30.
@@ -113,8 +117,6 @@ resistive touch. Roughly $30.
 
 Also sold directly by Elecrow and through the usual electronics distributors;
 any listing for the 3.5" CrowPanel with an ILI9488 should be the same board.
-Nothing else is needed — no enclosure, no extra sensors, and the USB-C cable
-that flashes it also powers it.
 
 The vendor listing for this board is wrong in two ways that matter. Values below
 were read off the unit itself, not the listing — the same `[CHIP]` line
@@ -132,7 +134,7 @@ is drawn directly rather than through LVGL, and the largest API response
 measured is about 3 KB — so `BOARD_HAS_PSRAM` is deliberately left undefined
 rather than enabled on a guess.
 
-### Board revisions matter — build the one that matches your unit
+#### Board revisions matter — build the one that matches your unit
 
 Elecrow shipped v2.0 and v2.2, which swap two pins:
 
@@ -165,7 +167,7 @@ Because `TOUCH_CS` is defined, TFT_eSPI compiles its touch support in and emits
 no warning about it. A `TOUCH_CS pin not defined` warning would mean the pin has
 gone missing from the build flags and tap-to-wake is silently disabled.
 
-### Pins
+#### Pins
 
 | Signal | GPIO |
 | :--- | :--- |
@@ -179,11 +181,7 @@ gone missing from the build flags and tap-to-wake is silently disabled.
 | `BACKLIGHT_PIN` | 27 — PWM-capable, which is what makes night dimming possible |
 | BOOT button | 0 |
 
-The two revision-dependent pins are the whole reason there are two build
-environments; see [Board revisions](#board-revisions-matter--build-the-one-that-matches-your-unit)
-above.
-
-### Second board: QDtech ES3C28P 2.8"
+### QDtech ES3C28P 2.8"
 
 **Hosyond / QDtech ES3C28P** — ESP32-S3, 2.8" ILI9341V 320x240 IPS over SPI,
 FT6336G capacitive touch. One build environment:
@@ -202,11 +200,12 @@ PSRAM up at boot and adds it to the heap; nothing in this firmware relies on
 it, and `BOARD_HAS_PSRAM` stays undefined.
 
 Same firmware and features, laid out for the smaller panel (`src/layout.h`):
-three departures in 58 px rows with the countdown in the medium font beside the
-departure time, the delay status and the header clock in the small font, and a
-route header that shows "South San Francisco" and "California Avenue" as
-"S. San Francisco" and "California Ave" (`src/station_label.h`) so every station
-pair fits on one line. The setup portal keeps the full names.
+three departures in 58 px rows with the countdown in the same large font as the
+3.5" — dropping to the medium font at 100 minutes and over, where a third
+digit would reach into the frame — the delay status and the header clock in the
+small font, and a route header that shows "South San Francisco" and "California
+Avenue" as "S. San Francisco" and "California Ave" (`src/station_label.h`) so
+every station pair fits on one line. The setup portal keeps the full names.
 
 Touch is capacitive and read over I2C, not through TFT_eSPI, so this build prints
 TFT_eSPI's `TOUCH_CS pin not defined` warning. **On this board that warning is
@@ -312,8 +311,8 @@ If the page stops loading partway, you have almost certainly come off the sign's
 network. Rejoin `Caltrain-XXXX` and open `http://192.168.4.1` again — nothing is
 saved until you press Save, so you start that step over, not the whole setup.
 
-**To get back into setup later:** hold **BOOT** while powering on. With no
-touchscreen this is the only way in, so it is worth remembering.
+**To get back into setup later:** hold **BOOT** while powering on. Touch only
+wakes the screen, so this is the only way in, and it is worth remembering.
 
 ---
 
@@ -513,6 +512,14 @@ src/
   urgency.h         the red/yellow/green rule and its bounds         [pure]
   config.*          NVS settings; validation half is pure
   siri_client.*     HTTPS GET                                        [device]
+  net_task.*        the fetch, pinned to core 0                      [device]
+  ota_manifest.*    parse and version-check the OTA manifest         [pure]
+  ota_verify.*      manifest signature check                         [pure]
+  ota_health.*      trial-boot health gate and rollback              [pure]
+  ota_task.*        the daily OTA check and install                  [device]
+  ota_pubkey.h      the public key a device trusts
+  csrf_check.h, html_escape.h, wifi_pass_policy.h
+                    portal input handling                            [pure]
   layout.h          per-board positions, fonts, splash text          [pure]
   station_label.h   short station names for the 2.8" header         [pure]
   display_hw.*      panel init, backlight PWM, touch                 [device]
@@ -525,8 +532,13 @@ tools/
   board_dump.cpp    board model -> JSON, for the screenshot (host build)
   gen_screenshot.py that JSON -> docs/images/*.png
   probe_511.py      measures the live API; run before trusting assumptions
+  publish_ota.sh    sign and publish a release from a workstation
+  gen_ota_test_vectors.sh, extract_pubkey_pem.py
+                    OTA signing test fixtures and key tooling
   package.sh        tarball for transfer to the build machine
   mac_flash.sh      build and flash from macOS
+scripts/
+  apply-repo-settings.sh  branch protection and required checks
 bringup/            standalone panel smoke test
 third_party/        ArduinoJson 7.1.0, vendored
 ```
@@ -619,24 +631,26 @@ nearly shipped.
   (LEDC channel 0) after. The backlight is now a separate `BACKLIGHT_PIN` flag
   that TFT_eSPI never sees.
 
-## Regenerating the screenshot
+## Regenerating the screenshots
 
-The board image at the top is generated, not mocked up:
+Every image at the top of this page is generated, not mocked up:
 
 ```bash
 g++ -std=c++17 -Isrc -Ithird_party tools/board_dump.cpp \
     src/board_model.cpp src/timetable.cpp src/route.cpp src/siri_parse.cpp \
     -o /tmp/board_dump
 TZ=America/Los_Angeles /tmp/board_dump "San Francisco" "San Jose Diridon" \
-    test/fixtures/stopmonitoring_70012.json | python3 tools/gen_screenshot.py
+    test/fixtures/stopmonitoring_70012.json > /tmp/board.json
 
-python3 tools/gen_screenshot.py --splash          # the boot screen
-python3 tools/gen_screenshot.py --legend          # the urgency swatch
+python3 tools/gen_screenshot.py < /tmp/board.json                  # 3.5" board
+python3 tools/gen_screenshot.py --board es3c28p < /tmp/board.json  # 2.8" board
+python3 tools/gen_screenshot.py --splash                           # 3.5" boot screen
+python3 tools/gen_screenshot.py --splash --board es3c28p           # 2.8" boot screen
+python3 tools/gen_screenshot.py --legend                           # the urgency swatch
 ```
 
-The splash renderer reads the attribution strings out of `src/layout.h` rather
-than restating them, and warns if a line overruns the panel. Two copies of a
-legal notice drift apart, and the copy in the picture is the one people quote.
+Each writes into `docs/images/` along with a 2x copy. Add `--out DIR` to write
+a preview somewhere else instead, for trying out a layout change.
 
 `board_dump.cpp` is a printf around `buildBoard()` — it links the same modules
 the firmware does rather than reimplementing them, so the numbers are real. The
@@ -644,38 +658,29 @@ geometry in `gen_screenshot.py` is copied from `src/layout.h` and the RGB565
 colours from `render.cpp`. Text is drawn with TFT_eSPI's own glyphs, decoded from
 the font files a PlatformIO build fetches into `.pio/libdeps`, so after any
 `pio run` the image is the panel's pixels. Without a build it falls back to
-DejaVu Sans, which is noticeably wider, and prints a note saying so. If
-`layout.h` changes, `gen_screenshot.py` has to be changed with it.
+DejaVu Sans, which is noticeably wider, and prints a note saying so. **If
+`layout.h` changes, `gen_screenshot.py` has to be changed with it** — nothing
+keeps the two in step.
 
-The committed images under `docs/images/` predate this pixel-accurate
-renderer; they are regenerated by running the commands above.
+The splash renderer reads the attribution strings out of `src/layout.h` rather
+than restating them, and warns if a line overruns the panel. Two copies of a
+legal notice drift apart, and the copy in the picture is the one people quote.
 
-The 2.8" ES3C28P layout renders the same way, as a preview into a directory of
-your choosing rather than `docs/images/`:
+## AI assistance
 
-```bash
-TZ=America/Los_Angeles /tmp/board_dump "San Francisco" "San Jose Diridon" \
-    test/fixtures/stopmonitoring_70012.json \
-    | python3 tools/gen_screenshot.py --board es3c28p --out /tmp/previews
-python3 tools/gen_screenshot.py --splash --board es3c28p --out /tmp/previews
-```
+This project was built with substantial help from an AI coding assistant
+(Anthropic's Claude) — firmware, the generator tooling, the host tests, and this
+documentation. Every change is gated by CI: host tests under `-Werror`, device
+builds for every supported board, and a checksum-pinned secret scan that
+self-tests against a generated probe before its result is trusted.
 
-Values in the generated header are readable RGB565 literals, so every push must
-be wrapped in `setSwapBytes(true)` with the previous value restored. Wrong
-colours with a correct-looking image means that flag.
-
-## Conventions
-
-- Pure logic lives in host-tested modules; Arduino, WiFi and NVS sit behind
-  `#ifdef ARDUINO`. That split is what lets `cd test && make` run the interesting
-  half with no board and no network.
-- **Tests are mutation-checked.** Several passed against deliberately broken code
-  before being retargeted — if a test cannot be made to fail, it is not testing
-  anything.
-- `platformio.ini` pins the platform and every library exactly. A bare
-  `espressif32` resolves to whatever is installed and silently swaps the Arduino
-  core.
-- Credentials live in NVS only, never in source and never in a binary.
+Where the documentation states a fact about the 511 feed, that fact was measured
+against the live API with `tools/probe_511.py` and the response committed as a
+fixture — not inferred, and not taken from the vendor's description. When a
+re-measurement contradicted something already written down, the documentation
+changed: see the `RecordedAtTime` note in `src/siri_parse.h`, which records two
+disagreeing observations rather than the tidier claim that was there before.
+Nothing here is auto-generated and left unchecked.
 
 ## Licence, attribution and credits
 

@@ -93,17 +93,24 @@ inline constexpr int ROUTE_LINE2_DY = 18;    // "> destination", ends where the 
 inline constexpr int NOTE_DY = 34;
 inline constexpr bool SHORT_STATION_NAMES = true;
 
-// Departure rows, 58 px each. The countdown is in font 4 on the time line —
-// also Alan's call — so "min", the time and the train sit further left: three
-// digits are 42 px, and "min" ends 13 px before the time column.
-inline constexpr uint8_t COUNT_FONT = FONT_MED;
-inline constexpr int COUNT_R = 46;
-inline constexpr int COUNT_PAD = 44;
-inline constexpr int COUNT_DY = 17;          // centred on the time line
+// Departure rows, 58 px each. The countdown is in font 6, the 3.5"'s own
+// countdown font — Alan's call at the 2026-09-20 render review, after font 4
+// (17 px digits) read too small across a room. Font 6 digits are 27 px wide
+// and 36 px of ink, centred in the row; two of them are 54 px and end at
+// COUNT_R. A third digit would reach into the frame, so 100 and over drops to
+// font 4 (42 px for three digits), sitting on the same baseline as "min".
+// A countdown that long is never urgent, so it has no need to be big.
+inline constexpr uint8_t COUNT_FONT = FONT_BIG;
+inline constexpr int COUNT_R = 62;
+inline constexpr int COUNT_PAD = 56;
+inline constexpr int COUNT_DY = 34;          // font 6 ink spans rows 11..46 of the row
+inline constexpr int COUNT_BIG_MAX_DIGITS = 2;
+inline constexpr uint8_t COUNT_FONT_WIDE = FONT_MED;
+inline constexpr int COUNT_WIDE_DY = 41;     // font 4 ink ends on row 46, like font 6's
 inline constexpr int MIN_LABEL_DX = 4;
 inline constexpr int MIN_LABEL_PAD = 22;
-inline constexpr int MIN_LABEL_DY = 13;      // top edge, level with the digits' lower half
-inline constexpr int COL_INFO_X = 82;
+inline constexpr int MIN_LABEL_DY = 33;      // top edge; sits on the digits' baseline
+inline constexpr int COL_INFO_X = 94;
 inline constexpr int WHEN_DY = 17;
 inline constexpr int WHEN_PAD = 70;
 // The status stays in the small font so it reads as secondary to the time.
@@ -188,6 +195,11 @@ inline constexpr int COUNT_DY = 40;
 inline constexpr int MIN_LABEL_DX = 6;
 inline constexpr int MIN_LABEL_PAD = 34;
 inline constexpr int MIN_LABEL_DY = 46;
+// Font 6 fits three digits in COUNT_R here, so the narrower fallback the
+// 2.8" needs never triggers on this panel.
+inline constexpr int COUNT_BIG_MAX_DIGITS = 3;
+inline constexpr uint8_t COUNT_FONT_WIDE = FONT_BIG;
+inline constexpr int COUNT_WIDE_DY = 40;
 inline constexpr int COL_INFO_X = 156;
 inline constexpr int WHEN_DY = 28;
 inline constexpr int WHEN_PAD = 110;
@@ -263,7 +275,8 @@ static_assert(UPD_TITLE_Y == 70 && UPD_VER_Y == 115 && UPD_BAR_X == 60 && UPD_BA
                   UPD_STEP_Y == 240 && UPD_WARN_Y == 265,
               "CrowPanel update screen layout changed");
 static_assert(CLOCK_FONT == FONT_MED && COUNT_FONT == FONT_BIG && COUNT_DY == 40 &&
-                  MIN_LABEL_DY == 46,
+                  MIN_LABEL_DY == 46 && COUNT_BIG_MAX_DIGITS == 3 &&
+                  COUNT_FONT_WIDE == FONT_BIG && COUNT_WIDE_DY == 40,
               "CrowPanel clock or countdown changed");
 #endif
 

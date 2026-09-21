@@ -7,11 +7,13 @@
     TZ=America/Los_Angeles /tmp/board_dump "San Francisco" "San Jose Diridon" \
         test/fixtures/stopmonitoring_70012.json | python3 tools/gen_screenshot.py
 
-The 2.8" QDtech ES3C28P layout renders as a preview only, into a directory of
-your choosing rather than docs/images/:
+The 2.8" QDtech ES3C28P layout renders the same way, with --board es3c28p.
+Either board takes --out DIR to write a preview somewhere other than
+docs/images/:
 
+    ... | python3 tools/gen_screenshot.py --board es3c28p
+    python3 tools/gen_screenshot.py --splash --board es3c28p
     ... | python3 tools/gen_screenshot.py --board es3c28p --out /some/dir
-    python3 tools/gen_screenshot.py --splash --board es3c28p --out /some/dir
 
 WHAT THIS IS, AND WHAT IT IS NOT. The numbers come from tools/board_dump.cpp,
 which links the SAME board_model/timetable/route/siri_parse the firmware does
@@ -62,24 +64,27 @@ BOARDS = {
         ROUTE_WRAP=False, ROUTE_LINE1_DY=0, ROUTE_LINE2_DY=0, NOTE_DY=34,
         SHORT_STATION_NAMES=False,
         COUNT_FONT=6, COUNT_R=108, COUNT_DY=40, MIN_LABEL_DX=6, MIN_LABEL_DY=46,
+        COUNT_BIG_MAX_DIGITS=3, COUNT_FONT_WIDE=6, COUNT_WIDE_DY=40,
         COL_INFO_X=156, WHEN_DY=28, ROW_STATUS_FONT=4, INFO_DY=60,
         SPLASH_TITLE_Y=74, SPLASH_ATTR_Y=126, SPLASH_ATTR_DY=20, SPLASH_NOTE_Y=282,
         SPLASH_ARRAY="kSplashAttributionWide",
         OUT=os.path.join(ROOT, "docs", "images", "board-sf-to-diridon.png"),
         OUT_SPLASH=os.path.join(ROOT, "docs", "images", "splash.png"),
     ),
-    # QDtech ES3C28P 2.8" — layout.h's BOARD_ES3C28P block. Preview only.
+    # QDtech ES3C28P 2.8" — layout.h's BOARD_ES3C28P block.
     "es3c28p": dict(
         SCREEN_W=320, SCREEN_H=240, BORDER=6, HEADER_H=52,
         CLOCK_FONT=2, CLOCK_DY=9, COL_RIGHT_INSET=6, ROUTE_CLOCK_GAP=16,
         ROUTE_FONT_BIG=2, ROUTE_BIG_DY=9, ROUTE_SMALL_DY=9,
         ROUTE_WRAP=True, ROUTE_LINE1_DY=2, ROUTE_LINE2_DY=18, NOTE_DY=34,
         SHORT_STATION_NAMES=True,
-        COUNT_FONT=4, COUNT_R=46, COUNT_DY=17, MIN_LABEL_DX=4, MIN_LABEL_DY=13,
-        COL_INFO_X=82, WHEN_DY=17, ROW_STATUS_FONT=2, INFO_DY=43,
+        COUNT_FONT=6, COUNT_R=62, COUNT_DY=34, MIN_LABEL_DX=4, MIN_LABEL_DY=33,
+        COUNT_BIG_MAX_DIGITS=2, COUNT_FONT_WIDE=4, COUNT_WIDE_DY=41,
+        COL_INFO_X=94, WHEN_DY=17, ROW_STATUS_FONT=2, INFO_DY=43,
         SPLASH_TITLE_Y=26, SPLASH_ATTR_Y=50, SPLASH_ATTR_DY=17, SPLASH_NOTE_Y=220,
         SPLASH_ARRAY="kSplashAttributionNarrow",
-        OUT=None, OUT_SPLASH=None,
+        OUT=os.path.join(ROOT, "docs", "images", "board-es3c28p-sf-to-diridon.png"),
+        OUT_SPLASH=os.path.join(ROOT, "docs", "images", "splash-es3c28p.png"),
     ),
 }
 
@@ -354,8 +359,11 @@ def render(model, b):
 
     for i, r in enumerate(model["rows"][:BOARD_ROWS]):
         y = ROWS_Y + i * ROW_H
-        text(d, (COL_MIN_R, y + b["COUNT_DY"]), str(r["minutesAway"]),
-             b["COUNT_FONT"], URGENCY[r["urgency"]], "MR")
+        # render.cpp drops to COUNT_FONT_WIDE past COUNT_BIG_MAX_DIGITS digits.
+        mins = str(r["minutesAway"])
+        wide = len(mins) > b["COUNT_BIG_MAX_DIGITS"]
+        text(d, (COL_MIN_R, y + b["COUNT_WIDE_DY" if wide else "COUNT_DY"]), mins,
+             b["COUNT_FONT_WIDE" if wide else "COUNT_FONT"], URGENCY[r["urgency"]], "MR")
         text(d, (COL_MIN_R + b["MIN_LABEL_DX"], y + b["MIN_LABEL_DY"]), "min", 2, COL_DIM, "TL")
         text(d, (COL_INFO, y + b["WHEN_DY"]), r["when"], 4, COL_TEXT, "ML")
 
@@ -487,8 +495,6 @@ def main():
         sys.exit(f"unknown --board {board_name}; choose from {', '.join(BOARDS)}")
     b = BOARDS[board_name]
     out_dir = arg_value("--out")
-    if b["OUT"] is None and out_dir is None:
-        sys.exit(f"--board {board_name} renders previews only; pass --out DIR")
 
     if "--splash" in sys.argv:
         path = os.path.join(out_dir, f"splash-{board_name}.png") if out_dir else b["OUT_SPLASH"]

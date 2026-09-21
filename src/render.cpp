@@ -155,6 +155,7 @@ struct Cache {
   char     info[BOARD_ROWS][40];
   char     delay[BOARD_ROWS][16];
   uint16_t minsColour[BOARD_ROWS];
+  uint8_t  minsFont[BOARD_ROWS];  // font the countdown was last drawn in; 0 = none yet
   char     pct[8];  // formatted "NN" (or empty), for updating()'s bar + label
   // "vFrom  >  vTo" for updating(). Sized for the worst case: two 31-char
   // version fields (OtaRelease::version and ota_task::Progress::version are
@@ -534,15 +535,30 @@ void board(const BoardModel& model, const char* originName, const char* destName
       delay[0] = '\0';
     }
 
-    // The countdown: font 6 on the 3.5" (digits only, which is all this is),
-    // font 4 on the time line on the 2.8" (COUNT_FONT and COUNT_DY, layout.h).
+    // The countdown: font 6 (digits only, which is all this is). On the 2.8"
+    // a countdown longer than COUNT_BIG_MAX_DIGITS would reach into the frame
+    // at that size, so it drops to COUNT_FONT_WIDE instead (layout.h).
     if (changed(g_cache.mins[i], sizeof(g_cache.mins[i]), mins) ||
         g_cache.minsColour[i] != minsColour) {
       g_cache.minsColour[i] = minsColour;
+      const bool wide = (int)strlen(mins) > COUNT_BIG_MAX_DIGITS;
+      const uint8_t font = wide ? COUNT_FONT_WIDE : COUNT_FONT;
+      const int dy = wide ? COUNT_WIDE_DY : COUNT_DY;
+
+      // Padding only repaints the height of the font being drawn, so a switch
+      // from font 6 to the shorter font 4 would leave the top and bottom of
+      // the old digits behind. Clear the whole font 6 cell when the font
+      // changes; the rest of the time padding erases in place, flicker-free.
+      if (g_cache.minsFont[i] != font) {
+        g_cache.minsFont[i] = font;
+        const int h = t.fontHeight(COUNT_FONT);
+        t.fillRect(COL_MIN_R - COUNT_PAD, y + COUNT_DY - h / 2, COUNT_PAD, h, COL_BG);
+      }
+
       t.setTextDatum(MR_DATUM);
       t.setTextColor(minsColour, COL_BG);
       t.setTextPadding(COUNT_PAD);
-      t.drawString(mins, COL_MIN_R, y + COUNT_DY, COUNT_FONT);
+      t.drawString(mins, COL_MIN_R, y + dy, font);
 
       // The unit label only makes sense next to a number.
       t.setTextDatum(TL_DATUM);
