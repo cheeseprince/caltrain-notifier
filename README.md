@@ -1,4 +1,6 @@
-# Caltrain Notifier
+<div align="center">
+
+<h1>Caltrain Notifier</h1>
 
 [![CI](https://github.com/cheeseprince/caltrain-notifier/actions/workflows/ci.yml/badge.svg)](https://github.com/cheeseprince/caltrain-notifier/actions/workflows/ci.yml)
 [![Firmware](https://img.shields.io/github/v/tag/cheeseprince/caltrain-notifier?label=firmware&color=0b7285)](https://cheeseprince.github.io/caltrain-notifier/manifest.txt)
@@ -6,8 +8,24 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Claude](https://img.shields.io/badge/Claude-D97757?logo=claude&logoColor=fff)](#ai-assistance)
 
+<p>
 A desk sign showing the next three Caltrain departures from your station toward
 your destination, with a border that turns yellow then red as the train nears.
+</p>
+
+<p>
+<a href="#getting-it-running"><strong>Build one</strong></a>
+&middot;
+<a href="#4-set-it-up-from-your-phone">Setup</a>
+&middot;
+<a href="docs/HARDWARE.md">Hardware notes</a>
+&middot;
+<a href="docs/DEVELOPMENT.md">Developer docs</a>
+&middot;
+<a href="https://github.com/cheeseprince/caltrain-notifier/issues">Report a bug</a>
+&middot;
+<a href="SECURITY.md">Security</a>
+</p>
 
 <!-- Board and splash images are shown at true relative size: the 3.5" panel is
      165 px/in and the 2.8" is 143 px/in, so the 2.8" images display 1.154x
@@ -15,19 +33,44 @@ your destination, with a border that turns yellow then red as the train nears.
      The @2x files keep both sharp on high-DPI screens. -->
 <img src="docs/images/board-sf-to-diridon@2x.png" width="480" height="320"
      alt="The board on the 3.5-inch CrowPanel, San Francisco to San Jose Diridon">
-
-The same firmware on the smaller 2.8" ES3C28P, laid out for its panel, shown
-here at true size relative to the 3.5" above:
-
 <img src="docs/images/board-es3c28p-sf-to-diridon@2x.png" width="369" height="277"
      alt="The board on the 2.8-inch ES3C28P, same trains">
 
-*Nine minutes to the 20:55 — close enough that the frame has gone red, while the
-two behind it are still green. Both images are generated from the committed 511
+<sub>The 3.5" CrowPanel (left) and the 2.8" ES3C28P, at true relative size.</sub>
+
+</div>
+
+<details>
+<summary><strong>Table of contents</strong></summary>
+
+- [What it shows](#what-it-shows)
+- [Before you build one — four things](#before-you-build-one--four-things)
+- [Hardware](#hardware)
+- [Getting it running](#getting-it-running)
+  - [Prerequisites](#prerequisites)
+  - [1. Get a 511 API token](#1-get-a-511-api-token)
+  - [2. Prove the panel](#2-prove-the-panel)
+  - [3. Flash the firmware](#3-flash-the-firmware)
+  - [4. Set it up from your phone](#4-set-it-up-from-your-phone)
+- [How it decides what to show](#how-it-decides-what-to-show)
+- [Over-the-air updates](#over-the-air-updates)
+- [AI assistance](#ai-assistance)
+- [Licence, attribution and credits](#licence-attribution-and-credits)
+
+Elsewhere: [Hardware notes](docs/HARDWARE.md) ·
+[Developer docs](docs/DEVELOPMENT.md) · [Contributing](CONTRIBUTING.md) ·
+[Attribution](ATTRIBUTION.md) · [Security](SECURITY.md)
+
+</details>
+
+## What it shows
+
+*Above: nine minutes to the 20:55 — close enough that the frame has gone red,
+while the two behind it are still green. Both images are generated from the committed 511
 capture by `tools/board_dump.cpp`, which links the same board-model, timetable
 and parser code the firmware runs, and drawn with the panel's own fonts — so the
 trains, countdowns and pixels are the ones the device would show. See
-[Regenerating the screenshots](#regenerating-the-screenshots).*
+[Regenerating the screenshots](docs/DEVELOPMENT.md#regenerating-the-screenshots).*
 
 Every boot shows who the data belongs to, and who this is not:
 
@@ -102,7 +145,6 @@ does and does not affect.
 
 Full detail, including what each agency requires: **[ATTRIBUTION.md](ATTRIBUTION.md)**.
 
-
 ## Hardware
 
 | | Elecrow CrowPanel 3.5" | QDtech ES3C28P 2.8" |
@@ -117,127 +159,23 @@ Full detail, including what each agency requires: **[ATTRIBUTION.md](ATTRIBUTION
 Nothing else is needed for either — no enclosure, no extra sensors, and the
 USB-C cable that flashes the board also powers it.
 
-### Elecrow CrowPanel 3.5"
-
-**Elecrow CrowPanel 3.5" ESP32 HMI display** — ILI9488 480x320 SPI, XPT2046
-resistive touch. Roughly $30.
-
-- [Amazon — B0FXLB5CFL](https://www.amazon.com/dp/B0FXLB5CFL)
-
-Also sold directly by Elecrow and through the usual electronics distributors;
-any listing for the 3.5" CrowPanel with an ILI9488 should be the same board.
-
-The vendor listing for this board is wrong in two ways that matter. Values below
-were read off the unit itself, not the listing — the same `[CHIP]` line
-`src/main.cpp` prints on every boot, so any owner of this board can reproduce it.
-
-| | Listing says | Actually is |
-| :--- | :--- | :--- |
-| Module | ESP32-WROVER-B | **ESP32-D0WD** rev 1.01, 2 cores, 240 MHz |
-| Flash | 4 MB | **8 MB** |
-| PSRAM | 8 MB | **Unconfirmed** — see below |
-
-PSRAM was never verified. The bring-up build did not enable it, so its report of
-zero proves nothing either way. Nothing in this firmware needs it — the display
-is drawn directly rather than through LVGL, and the largest API response
-measured is about 3 KB — so `BOARD_HAS_PSRAM` is deliberately left undefined
-rather than enabled on a guess.
-
-#### Board revisions matter — build the one that matches your unit
-
-Elecrow shipped v2.0 and v2.2, which swap two pins:
-
-| | v2.0 | v2.2 |
-| :--- | :--- | :--- |
-| `TFT_MISO` | 12 | 33 |
-| `TOUCH_CS` | 33 | 12 |
-
-Both pins are used. Touch wakes the screen — `display::touched()` reads the
-XPT2046's raw pressure, never coordinates, so there is no calibration — and
-reading the touch controller needs both `TOUCH_CS` and a real `TFT_MISO`.
-
-So there are **two environments, and you must build the one matching your
-board**:
-
-```bash
-pio run -e caltrain        # revision 2.2
-pio run -e caltrain_v20    # revision 2.0
-```
-
-Flashing the wrong one leaves a working display whose screen never wakes on a
-tap, with nothing on the console to say why. If tapping does nothing, you are
-almost certainly on the other revision — build the other environment.
-
-The unit this was developed on is v2.2. `bringup/` proves the display and touch
-independently of the firmware, and is the fastest way to tell the revisions
-apart if the silkscreen is ambiguous.
-
-Because `TOUCH_CS` is defined, TFT_eSPI compiles its touch support in and emits
-no warning about it. A `TOUCH_CS pin not defined` warning would mean the pin has
-gone missing from the build flags and tap-to-wake is silently disabled.
-
-#### Pins
-
-| Signal | GPIO |
-| :--- | :--- |
-| `TFT_MOSI` | 13 |
-| `TFT_SCLK` | 14 |
-| `TFT_CS` | 15 |
-| `TFT_DC` | 2 |
-| `TFT_RST` | −1 (tied to the ESP32 reset line) |
-| `TFT_MISO` | **33** on v2.2, **12** on v2.0 — read back from the touch controller |
-| `TOUCH_CS` | **12** on v2.2, **33** on v2.0 |
-| `BACKLIGHT_PIN` | 27 — PWM-capable, which is what makes night dimming possible |
-| BOOT button | 0 |
-
-### QDtech ES3C28P 2.8"
-
-**Hosyond / QDtech ES3C28P** — ESP32-S3, 2.8" ILI9341V 320x240 IPS over SPI,
-FT6336G capacitive touch. One build environment:
-
-```bash
-pio run -e caltrain_es3c28p
-```
-
-- [Amazon — B0FKG7WRWV](https://www.amazon.com/dp/B0FKG7WRWV)
-- Manufacturer pin table, dimension drawing and STEP model:
-  [lcdwiki — 2.8inch ESP32-S3 Display](https://www.lcdwiki.com/2.8inch_ESP32-S3_Display_E32C28P/E32N28P)
-
-Read off the unit with `esptool.py flash_id`: ESP32-S3 (QFN56) rev v0.2,
-**16 MB quad flash, 8 MB octal PSRAM**. The S3's SDK configuration brings that
-PSRAM up at boot and adds it to the heap; nothing in this firmware relies on
-it, and `BOARD_HAS_PSRAM` stays undefined.
-
-Same firmware and features, laid out for the smaller panel (`src/layout.h`):
-three departures in 58 px rows with the countdown in the same large font as the
-3.5" — dropping to the medium font at 100 minutes and over, where a third
-digit would reach into the frame — the delay status and the header clock in the
-small font, and a route header that shows "South San Francisco" and "California
-Avenue" as "S. San Francisco" and "California Ave" (`src/station_label.h`) so
-every station pair fits on one line. The setup portal keeps the full names.
-
-Touch is capacitive and read over I2C, not through TFT_eSPI, so this build prints
-TFT_eSPI's `TOUCH_CS pin not defined` warning. **On this board that warning is
-expected**; the `[TOUCH] FT6336 id=0x11` line at boot is what confirms
-tap-to-wake.
-
-| Signal | GPIO |
-| :--- | :--- |
-| `TFT_MOSI` / `TFT_SCLK` / `TFT_MISO` | 11 / 12 / 13 |
-| `TFT_CS` / `TFT_DC` | 10 / 46 |
-| `TFT_RST` | −1 (tied to the ESP32-S3 reset line) |
-| `BACKLIGHT_PIN` | 45 — active high, PWM |
-| Touch `SDA` / `SCL` / `RST` | 16 / 15 / 18 (FT6336G at I2C `0x38`; `INT` on 17 is unused) |
-| BOOT button | 0 |
-
-Bring-up on a real unit (2026-09-12) showed this IPS panel draws a negative
-without colour inversion, so `caltrain_es3c28p` sets `TFT_INVERSION_ON`. Rotation
-is the same landscape `setRotation(1)` as the CrowPanel, with the USB-C connector
-on the right.
+**CrowPanel owners: build the environment that matches your board revision.**
+v2.0 and v2.2 swap two pins; the wrong build gives a working display whose
+screen never wakes on a tap. Revisions, pin tables, what the vendor listings
+get wrong and bring-up notes for both boards: **[docs/HARDWARE.md](docs/HARDWARE.md)**.
 
 ---
 
 ## Getting it running
+
+### Prerequisites
+
+- [ ] One of the two [supported boards](#hardware) and a USB-C data cable
+- [ ] Your own free 511 API token — step 1 below
+- [ ] A Mac or Linux machine with Python 3; `tools/mac_flash.sh` installs
+      PlatformIO into a local `.venv-pio` for you (on Linux, `pip install
+      -r requirements.txt` and use `pio` directly)
+- [ ] A 2.4 GHz WiFi network the sign can join, and a phone to run setup
 
 ### 1. Get a 511 API token
 
@@ -264,7 +202,8 @@ echo 'YOUR-TOKEN' > .511-token
 
 ### 2. Prove the panel
 
-Optional but worth it on a new board:
+Optional but worth it on a new CrowPanel (`bringup/` is a CrowPanel smoke
+test; the ES3C28P goes straight to step 3):
 
 ```bash
 ./tools/mac_flash.sh bringup
@@ -276,7 +215,8 @@ labelled and framed to all four edges.
 ### 3. Flash the firmware
 
 ```bash
-./tools/mac_flash.sh firmware
+./tools/mac_flash.sh firmware          # CrowPanel v2.2
+./tools/mac_flash.sh firmware v20      # CrowPanel v2.0
 ```
 
 The script installs PlatformIO into a local `.venv-pio` — nothing touches the
@@ -343,73 +283,9 @@ Jose looks identical to a train you could catch, even when it sails straight
 past your station. Every live departure is therefore looked up in the timetable
 by train number and dropped if that train does not stop at your destination.
 
-### Things measured against the live API, not assumed
-
-All verified with `tools/probe_511.py` — first against an intermediate stop on
-weekend service, then re-checked against a terminus on weekday service. The
-second capture is committed as `test/fixtures/stopmonitoring_70012.json`:
-
-| Question | Answer |
-| :--- | :--- |
-| Does `api.511.org` serve HTTPS? | Yes. Certificates are validated against the Mozilla root bundle, not `setInsecure()` |
-| Does it gzip? | **Only if you ask.** Without `Accept-Encoding: gzip` it returns plain JSON. The client asks for `identity` explicitly |
-| UTF-8 BOM? | No, but the parser tolerates one |
-| Response size | ~3.0 KB for three departures |
-| Departure cap | **3**, always. `MaximumStopVisits` is accepted and ignored |
-| Rate limit | **60 requests/hour per token.** Polling every 75 s uses 48 |
-| `RecordedAtTime` | **Inconsistent.** Epoch zero on the intermediate-stop/weekend capture; a real time on the terminus/weekday one (`test/fixtures/stopmonitoring_70012.json`). Not dependable as a freshness signal, so staleness is tracked by the device's own clock |
-| Schedule endpoint | `stoptimetable` returns a fixed 4-entry rolling window and ignores `StartTime`/`EndTime`, so it cannot back an offline cache |
-
-That last row is why the timetable is compiled into flash rather than fetched.
-
-### Service patterns
-
-Caltrain runs **three** timetables, not two:
-
-| Pattern | Trips | Runs on |
-| :--- | :--- | :--- |
-| Weekday | 112 | Mon–Fri |
-| Weekend | 66 | Sat/Sun, plus Memorial Day, Labor Day, Thanksgiving, Christmas, New Year's |
-| Holiday | 79 | President's Day, Day after Thanksgiving, Christmas Eve, MLK Day |
-
-The third is easy to miss — it appears only in `calendar_dates.txt`, never in
-`calendar.txt`, and its trains are numbered `M101` rather than `614`. Treating
-those four dates as weekends would show trains that are not running.
-
-### The service day is not the calendar day
-
-Caltrain writes a 00:40 train as `24:40`; it belongs to the previous day's
-timetable. At 01:00 on a Saturday the trains still running are Friday's. The
-rollover is at 03:00 local — after the last scheduled train (02:30) and before
-the first (04:37).
-
-Timezone handling uses the POSIX zone `PST8PDT,M3.2.0,M11.1.0` through libc, so
-the same code path runs on the device and in the host tests, including the days
-that are 23 or 25 hours long.
-
----
-
-## Keeping the timetable current
-
-The compiled schedule expires with the GTFS feed (currently valid to
-2027-01-31). Caltrain reissues a few times a year. Regenerate **both** headers
-from the same feed, since they share a station index space:
-
-```bash
-python3 tools/gen_stations.py
-python3 tools/gen_timetable.py
-cd test && make          # the tests assert against real service
-```
-
-Then reflash. Both generators print what they skipped and why — a silently
-dropped train is how a timetable quietly goes wrong.
-
-This is enforced, not just documented: CI's `timetable-freshness` job fails 90
-days before the compiled schedule's earlier validity bound (the last holiday
-override, or the GTFS feed's own end date, whichever comes first), and the
-board itself shows "TIMETABLE EXPIRED - holidays may differ" once that bound
-has actually passed, rather than silently running a full weekday timetable of
-trains that are not running.
+What the live API was measured to actually do, Caltrain's three timetables,
+and why the service day rolls over at 03:00:
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#how-it-decides-what-to-show--the-details).
 
 ---
 
@@ -446,22 +322,6 @@ interfere with that trial one way or the other — the build still gets to earn
 its keep, or get rolled back on its own merits, exactly as if the setting had
 stayed on.
 
-### Cutting a release
-
-```bash
-git tag v1.2.0 && git push --tags
-```
-
-That triggers `release.yml`, which builds **every** board (`caltrain`,
-`caltrain_v20` and `caltrain_es3c28p` — a release missing any one leaves that
-board unable to ever update), signs the manifest with the
-`OTA_SIGNING_KEY` repository secret, verifies that signature against the
-public key actually compiled into the firmware, and publishes the result to
-the `gh-pages` branch. `tools/publish_ota.sh` does the same thing from a
-workstation, for when CI is not the right path — it looks for the private
-key at `~/caltrain-ota-signing-key.pem` (override with
-`OTA_SIGNING_KEY_FILE`) and refuses to run without it, for the same reason.
-
 ### What you see on the desk
 
 The sign owns the screen for the whole attempt: a title, a progress bar, a
@@ -488,198 +348,9 @@ see `SECURITY.md` for the full trust model.
 
 ---
 
-## Development
-
-Bug reports, vulnerability reports and pull requests: see
-[CONTRIBUTING.md](CONTRIBUTING.md).
-
-### Host tests
-
-Pure logic — station lookup, direction, schedule queries, JSON parsing, the
-board merge, DST — builds and runs on any desktop with no board and no network:
-
-```bash
-cd test && make
-```
-
-Hardware, WiFi and NVS live behind `#ifdef ARDUINO` seams so the logic stays
-testable. Tests are deliberately mutation-checked: several were found to pass
-against a deliberately broken implementation and were retargeted until they
-failed.
-
-### Layout
-
-```
-src/
-  stations.h        GENERATED — 30 stations, ordered north to south
-  timetable_data.h  GENERATED — 257 trips, 5,414 calls, ~24 KB
-  route.*           station lookup, direction, platform stop_id      [pure]
-  timetable.*       service patterns, schedule queries               [pure]
-  siri_parse.*      511 JSON -> departures                           [pure]
-  board_model.*     merge live over schedule, express filter, colour [pure]
-  service_day.*     Pacific time, DST, the 03:00 service rollover    [pure]
-  urgency.h         the red/yellow/green rule and its bounds         [pure]
-  config.*          NVS settings; validation half is pure
-  siri_client.*     HTTPS GET                                        [device]
-  net_task.*        the fetch, pinned to core 0                      [device]
-  ota_manifest.*    parse and version-check the OTA manifest         [pure]
-  ota_verify.*      manifest signature check                         [pure]
-  ota_health.*      trial-boot health gate and rollback              [pure]
-  ota_task.*        the daily OTA check and install                  [device]
-  ota_pubkey.h      the public key a device trusts
-  csrf_check.h, html_escape.h, wifi_pass_policy.h
-                    portal input handling                            [pure]
-  layout.h          per-board positions, fonts, splash text          [pure]
-  station_label.h   short station names for the 2.8" header         [pure]
-  display_hw.*      panel init, backlight PWM, touch                 [device]
-  render.*          the screens                                      [device]
-  portal.*          SoftAP captive portal                            [device]
-  main.cpp          poll loop and 1 Hz tick
-tools/
-  gen_stations.py   GTFS -> src/stations.h
-  gen_timetable.py  GTFS -> src/timetable_data.h
-  board_dump.cpp    board model -> JSON, for the screenshot (host build)
-  gen_screenshot.py that JSON -> docs/images/*.png
-  probe_511.py      measures the live API; run before trusting assumptions
-  publish_ota.sh    sign and publish a release from a workstation
-  gen_ota_test_vectors.sh, extract_pubkey_pem.py
-                    OTA signing test fixtures and key tooling
-  package.sh        tarball for transfer to the build machine
-  mac_flash.sh      build and flash from macOS
-scripts/
-  apply-repo-settings.sh  branch protection and required checks
-bringup/            standalone panel smoke test
-third_party/        ArduinoJson 7.1.0, vendored
-```
-
-ArduinoJson is vendored rather than listed in `lib_deps` because plain `g++`
-cannot reach into `.pio/libdeps`. Vendoring is what makes the host tests
-exercise the same parser the device runs rather than a lookalike.
-
-### Footprint
-
-| | CrowPanel 3.5" | ES3C28P 2.8" |
-| :--- | :--- | :--- |
-| Flash | 1.10 MB of 3.19 MB app slot | 1.06 MB of 6.25 MB app slot |
-| RAM | 61.9 KB of 320.0 KB | 60.7 KB of 320.0 KB |
-
-Two app slots on both — plus 1.5 MB filesystem on the CrowPanel's 8 MB layout,
-6.25 MB slots on the ES3C28P's 16 MB layout — so a signed-OTA path stays open.
+Cutting and signing a release: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#cutting-a-release).
 
 ---
-
-## Inherited gotchas
-
-Carried over from bringing this same board up for `obd-gauge-cluster`. Each cost
-real debugging time once already.
-
-- **Do not define `TFT_WIDTH`/`TFT_HEIGHT`.** `ILI9488_Defines.h` sets them to
-  portrait 320×480; the app uses its own per-board `SCREEN_W`/`SCREEN_H` from
-  `src/layout.h` with a landscape rotation.
-- **Pin the platform.** A bare `espressif32` resolves to whatever is installed,
-  and a global pioarduino install silently swaps the Arduino core 2.x → 3.x.
-  That difference is invisible until something fails to compile — as
-  `setCACertBundle()` did here, which takes one argument on core 2.x and two on
-  core 3.x.
-- **Pin `lib_deps` exactly, no carets.** Dependabot has no PlatformIO ecosystem,
-  so nothing proposes bumps; a caret range means the same commit can build a
-  different binary later.
-- **Keep the HTTP read buffer file-scope `static`.** A 4 KB local plus a TLS
-  handshake overflows the ~8 KB `loopTask` stack — that produced a panic-reboot
-  with a blank screen once already.
-- **`setCACertBundle()` is not automatic on core 2.x.** The pointer must be
-  passed explicitly or validation silently does nothing.
-- **Use signed `millis()` deltas** — `(int32_t)(now - then)` — or the timers
-  stall at the 49-day rollover.
-- **Negative `HTTPClient` codes are not HTTP statuses.** `-1` means the
-  connection never opened.
-- **macOS: prefer the `cu.*` port.** Opening `tty.*` blocks on carrier detect.
-
-### Traps found building this one
-
-Distinct from the list above, which was carried over. Each of these shipped or
-nearly shipped.
-
-- **`configTime(0, 0, ...)` silently sets the timezone**, clobbering Pacific and
-  making the whole screen read UTC. Use `configTzTime(SERVICE_DAY_TZ, ...)`.
-  This shipped once.
-- **You cannot erase text by drawing it in the background colour.** TFT_eSPI's
-  padding fill is guarded by
-  `if ((padX > cwidth) && (textcolor != textbgcolor))`, so a
-  background-on-background draw of an empty string does nothing at all, and the
-  old pixels survive until the next full repaint. This shipped once, as a
-  staleness note frozen at "live data 240s old" through hours of healthy
-  fetches. Clear with `fillRect`. Every other field on the board happens to
-  erase correctly only because its colour differs from the background.
-- **Mid-grey on black fails off-axis.** `COL_DIM` was `0x8410`, a true 50% grey,
-  and became unreadable a few tens of degrees off centre — which is how a desk
-  sign is actually seen. It is now `0xC618`.
-- **`doFetch()` blocks the tick loop** for the length of the HTTPS round trip,
-  up to ~19 s measured. The clock and countdowns freeze for that window on every
-  poll. The fetch now runs pinned to core 0, which is what makes that tolerable.
-- **`intelhex` is easy to have globally and not in a fresh venv.** Its absence
-  makes `esptool` fail at flash time, not at build time, so a green build on the
-  development machine proved nothing about the machine with the board attached.
-- **An ESP32-S3's `Serial` goes nowhere by default.** On Arduino core 2.0.17
-  `ARDUINO_USB_CDC_ON_BOOT` defaults to 0, which sends `Serial` to UART0 on
-  GPIO43/44 — the ES3C28P's USB-C port shows nothing at all. `caltrain_es3c28p`
-  sets it to 1.
-- **The ES3C28P's flash is quad and its PSRAM octal: `memory_type = qio_opi`.**
-  Guides for similar S3 boards often say `opi_opi`, which is for modules whose
-  flash is octal too. `esptool.py flash_id` reports "Flash type set in eFuse:
-  quad".
-- **GPIO45 and GPIO46 are strapping pins, and are not a problem here.** The
-  ES3C28P puts the backlight (45) and panel DC (46) on them, but this chip's
-  eFuse fixes the flash voltage ("Flash voltage set by eFuse to 3.3V") and the
-  board boots and enters download mode normally.
-- **TFT_eSPI takes the backlight pin back from the PWM.** With `TFT_BL` and
-  `TFT_BACKLIGHT_ON` defined, `TFT_eSPI::init()` calls `pinMode()` on the pin,
-  which turns an LEDC-driven pin back into a plain GPIO — so `ledcWrite()` did
-  nothing and night dimming never worked, on either board. Found by reading
-  GPIO45's output-select register on the ES3C28P: 256 (plain GPIO) before, 73
-  (LEDC channel 0) after. The backlight is now a separate `BACKLIGHT_PIN` flag
-  that TFT_eSPI never sees.
-
-## Regenerating the screenshots
-
-Every image at the top of this page is generated, not mocked up:
-
-```bash
-g++ -std=c++17 -Isrc -Ithird_party tools/board_dump.cpp \
-    src/board_model.cpp src/timetable.cpp src/route.cpp src/siri_parse.cpp \
-    -o /tmp/board_dump
-TZ=America/Los_Angeles /tmp/board_dump "San Francisco" "San Jose Diridon" \
-    test/fixtures/stopmonitoring_70012.json > /tmp/board.json
-
-python3 tools/gen_screenshot.py < /tmp/board.json                  # 3.5" board
-python3 tools/gen_screenshot.py --board es3c28p < /tmp/board.json  # 2.8" board
-python3 tools/gen_screenshot.py --splash                           # 3.5" boot screen
-python3 tools/gen_screenshot.py --splash --board es3c28p           # 2.8" boot screen
-python3 tools/gen_screenshot.py --legend                           # the urgency swatch
-```
-
-Each writes into `docs/images/` along with a 2x copy. Add `--out DIR` to write
-a preview somewhere else instead, for trying out a layout change.
-
-The files are one image pixel per panel pixel. The README shows them at
-**true relative size** instead: the 3.5" panel packs 165 px/in and the 2.8"
-only 143, so the 2.8" images are displayed 1.154x wider than their pixel count
-(`width="369"` against the 3.5"'s 480). Keep those `width`/`height` attributes
-if either image is replaced.
-
-`board_dump.cpp` is a printf around `buildBoard()` — it links the same modules
-the firmware does rather than reimplementing them, so the numbers are real. The
-geometry in `gen_screenshot.py` is copied from `src/layout.h` and the RGB565
-colours from `render.cpp`. Text is drawn with TFT_eSPI's own glyphs, decoded from
-the font files a PlatformIO build fetches into `.pio/libdeps`, so after any
-`pio run` the image is the panel's pixels. Without a build it falls back to
-DejaVu Sans, which is noticeably wider, and prints a note saying so. **If
-`layout.h` changes, `gen_screenshot.py` has to be changed with it** — nothing
-keeps the two in step.
-
-The splash renderer reads the attribution strings out of `src/layout.h` rather
-than restating them, and warns if a line overruns the panel. Two copies of a
-legal notice drift apart, and the copy in the picture is the one people quote.
 
 ## AI assistance
 
