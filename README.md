@@ -9,11 +9,18 @@
 A desk sign showing the next three Caltrain departures from your station toward
 your destination, with a border that turns yellow then red as the train nears.
 
-![The board on the 3.5" CrowPanel, San Francisco to San Jose Diridon](docs/images/board-sf-to-diridon.png)
+<!-- Board and splash images are shown at true relative size: the 3.5" panel is
+     165 px/in and the 2.8" is 143 px/in, so the 2.8" images display 1.154x
+     their pixel width (320 -> 369, 240 -> 277) against the 3.5"'s 480 x 320.
+     The @2x files keep both sharp on high-DPI screens. -->
+<img src="docs/images/board-sf-to-diridon@2x.png" width="480" height="320"
+     alt="The board on the 3.5-inch CrowPanel, San Francisco to San Jose Diridon">
 
-The same firmware on the smaller 2.8" ES3C28P, laid out for its panel:
+The same firmware on the smaller 2.8" ES3C28P, laid out for its panel, shown
+here at true size relative to the 3.5" above:
 
-![The board on the 2.8" ES3C28P, same trains](docs/images/board-es3c28p-sf-to-diridon.png)
+<img src="docs/images/board-es3c28p-sf-to-diridon@2x.png" width="369" height="277"
+     alt="The board on the 2.8-inch ES3C28P, same trains">
 
 *Nine minutes to the 20:55 — close enough that the frame has gone red, while the
 two behind it are still green. Both images are generated from the committed 511
@@ -24,8 +31,10 @@ trains, countdowns and pixels are the ones the device would show. See
 
 Every boot shows who the data belongs to, and who this is not:
 
-![The boot splash on the 3.5", carrying the attribution and licence notice](docs/images/splash.png)
-![The same splash on the 2.8", rewrapped for the narrower panel](docs/images/splash-es3c28p.png)
+<img src="docs/images/splash@2x.png" width="480" height="320"
+     alt="The boot splash on the 3.5-inch panel, carrying the attribution and licence notice">
+<img src="docs/images/splash-es3c28p@2x.png" width="369" height="277"
+     alt="The same splash on the 2.8-inch panel, rewrapped for the narrower screen">
 
 The whole point is that you do not have to read it. The border alone tells you
 whether to keep sitting down:
@@ -651,6 +660,12 @@ python3 tools/gen_screenshot.py --legend                           # the urgency
 
 Each writes into `docs/images/` along with a 2x copy. Add `--out DIR` to write
 a preview somewhere else instead, for trying out a layout change.
+
+The files are one image pixel per panel pixel. The README shows them at
+**true relative size** instead: the 3.5" panel packs 165 px/in and the 2.8"
+only 143, so the 2.8" images are displayed 1.154x wider than their pixel count
+(`width="369"` against the 3.5"'s 480). Keep those `width`/`height` attributes
+if either image is replaced.
 
 `board_dump.cpp` is a printf around `buildBoard()` — it links the same modules
 the firmware does rather than reimplementing them, so the numbers are real. The
