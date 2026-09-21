@@ -22,6 +22,15 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # codeql-action ships init, analyze and upload-sarif from one repo at one
+    # version, and they must move together: bumped as three separate PRs
+    # (#7, #8, #9, 2026-09-15), each one left codeql.yml running an init and an
+    # analyze from different releases, and CodeQL failed on the mismatch. One
+    # group = one PR that bumps every codeql-action step at once.
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   - package-ecosystem: "pip"
     directory: "/"
