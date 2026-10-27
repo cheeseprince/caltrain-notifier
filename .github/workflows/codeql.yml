@@ -84,7 +84,7 @@ jobs:
       # runs between this step and the "Analyze" step below in its build
       # tracer, watching for compiler invocations.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d  # v4.38.3
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
           languages: c-cpp
           build-mode: manual
@@ -102,7 +102,7 @@ jobs:
         run: pio run -e caltrain_es3c28p
 
       - name: Analyze
-        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d  # v4.38.3
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
           category: "device-build"
 
@@ -122,7 +122,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y libmbedtls-dev
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d  # v4.38.3
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
           languages: c-cpp
           build-mode: manual
@@ -132,6 +132,6 @@ jobs:
         run: cd test && make
 
       - name: Analyze
-        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d  # v4.38.3
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
           category: "host-tests"
