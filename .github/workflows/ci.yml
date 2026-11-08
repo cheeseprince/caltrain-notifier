@@ -287,7 +287,9 @@ jobs:
 
   host-tests:
     name: Host tests
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: 26.04 ships mbedtls 3.6, which drops the
+    # *_ret API ota_verify.cpp uses. 24.04 ships 2.28, matching the ESP32 core.
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
