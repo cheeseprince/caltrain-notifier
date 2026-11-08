@@ -29,7 +29,9 @@ int main() {
   // five holidays run the weekend timetable, four run a separate reduced one.
   check(serviceForDate(20261225, 5) == SVC_WEEKEND, "Christmas Day -> weekend service");
   check(serviceForDate(20261224, 4) == SVC_HOLIDAY, "Christmas Eve -> reduced holiday service");
-  check(serviceForDate(20270127, 3) == SVC_HOLIDAY, "MLK Day -> reduced holiday service");
+  check(serviceForDate(20270118, 1) == SVC_HOLIDAY, "MLK Day -> reduced holiday service");
+  // The feed misdates MLK Day 2027 as this Wednesday; gen_timetable.py moves it.
+  check(serviceForDate(20270127, 3) == SVC_WEEKDAY, "Wednesday 2027-01-27 is an ordinary weekday");
   check(serviceForDate(20261127, 5) == SVC_HOLIDAY, "day after Thanksgiving -> holiday service");
   check(serviceForDate(20261126, 4) == SVC_WEEKEND, "Thanksgiving Day itself -> weekend service");
   check(serviceForDate(20261228, 1) == SVC_WEEKDAY, "the Monday after Christmas is ordinary");
