@@ -108,7 +108,8 @@ jobs:
 
   host-tests:
     name: CodeQL (host test build, g++, partial coverage -- see comments above)
-    runs-on: ubuntu-latest
+    # Pinned to 24.04 for mbedtls 2.28, same as host-tests in ci.yml.
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       security-events: write
