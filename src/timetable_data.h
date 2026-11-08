@@ -41,7 +41,7 @@ inline constexpr DateOverride kDateOverrides[] = {
     {20261224, 2},  // Christmas Eve -> holiday
     {20261225, 1},  // Christmas Day -> weekend
     {20270101, 1},  // New Year's Day -> weekend
-    {20270127, 2},  // Martin Luther King Jr. Day -> holiday
+    {20270118, 2},  // Martin Luther King Jr. Day (feed said 20270127) -> holiday
 };
 inline constexpr int kDateOverrideCount = 9;
 
@@ -59,7 +59,7 @@ inline constexpr int kDateOverrideCount = 9;
 // The two differ, and the earlier one governs: see timetableExpired() in
 // timetable.h, which the firmware calls once per service day to decide
 // whether to show a staleness warning.
-inline constexpr uint32_t kTimetableLastOverride = 20270127;
+inline constexpr uint32_t kTimetableLastOverride = 20270118;
 inline constexpr uint32_t kTimetableFeedEnd = 20270131;
 
 // One scheduled call: a station, and the minute past midnight the train

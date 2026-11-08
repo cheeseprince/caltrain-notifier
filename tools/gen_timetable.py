@@ -29,6 +29,7 @@ share a station index space and must be built from one feed version.
 """
 
 import argparse
+import datetime
 import pathlib
 import sys
 
@@ -66,6 +67,41 @@ def parse_gtfs_time(value: str) -> int | None:
     return h * 60 + m + (1 if s >= 30 else 0)
 
 
+def third_monday_of_january(year: int) -> datetime.date:
+    """The date Martin Luther King Jr. Day falls on (5 U.S.C. 6103)."""
+    jan1 = datetime.date(year, 1, 1)
+    # weekday(): Monday == 0. Step forward to the first Monday, then two weeks on.
+    first_monday = jan1 + datetime.timedelta(days=(7 - jan1.weekday()) % 7)
+    return first_monday + datetime.timedelta(weeks=2)
+
+
+def correct_mlk_dates(exceptions):
+    """Move any MLK Day exception the feed dates wrongly onto the third Monday.
+
+    The Trillium feed of 10-Jun-2026 lists Martin Luther King Jr. Day 2027 as
+    Wednesday 2027-01-27; the holiday is Monday 2027-01-18. Compiled as-is, the
+    board would show the reduced holiday timetable on an ordinary Wednesday and
+    a full weekday timetable on the holiday itself.
+
+    This is a rule, not a one-off patch of that date: a feed that already has
+    the right date passes through untouched, so the correction retires itself
+    once the upstream feed is fixed. Each move is reported on stderr, and the
+    original date is kept in the holiday name so the header comment shows it.
+    """
+    corrected = []
+    for r in exceptions:
+        name = r.get("holiday_name", "").strip()
+        if name.startswith("Martin Luther King"):
+            listed = r["date"]
+            actual = third_monday_of_january(int(listed[:4])).strftime("%Y%m%d")
+            if listed != actual:
+                print(f"warning: feed lists {name} on {listed}; moving it to {actual}",
+                      file=sys.stderr)
+                r = dict(r, date=actual, holiday_name=f"{name} (feed said {listed})")
+        corrected.append(r)
+    return corrected
+
+
 def resolve_services(gtfs):
     """Work out the service patterns and which dates deviate from the weekly one.
 
@@ -86,7 +122,7 @@ def resolve_services(gtfs):
     weekday_id = next(r["service_id"] for r in calendar if r["monday"] == "1")
     weekend_id = next(r["service_id"] for r in calendar if r["saturday"] == "1")
 
-    exceptions = read_csv(gtfs, "calendar_dates.txt")
+    exceptions = correct_mlk_dates(read_csv(gtfs, "calendar_dates.txt"))
     # Dates where the ordinary weekday service is withdrawn.
     cancelled = {
         r["date"] for r in exceptions
