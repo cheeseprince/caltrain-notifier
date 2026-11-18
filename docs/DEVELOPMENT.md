@@ -83,9 +83,14 @@ cd test && make          # the tests assert against real service
 Then reflash. Both generators print what they skipped and why — a silently
 dropped train is how a timetable quietly goes wrong.
 
-This is enforced, not just documented: CI's `timetable-freshness` job fails 90
-days before the compiled schedule's earlier validity bound (the last holiday
-override, or the GTFS feed's own end date, whichever comes first), and the
+This is enforced, not just documented: `tools/check_timetable_freshness.py`
+fails 90 days before the compiled schedule's earlier validity bound (the last
+holiday override, or the GTFS feed's own end date, whichever comes first). It
+runs in two places: as CI's `timetable-freshness` job on every PR (visible,
+but **not a required check**, because a PR cannot fix it), and weekly in
+`timetable-watch.yml`, which opens a tracking issue. Red does not always mean
+"regenerate": if Caltrain's newest feed still ends on the same date, there is
+nothing new to compile yet. Check `feed_info.txt`'s `feed_end_date` first. And the
 board itself shows "TIMETABLE EXPIRED - holidays may differ" once that bound
 has actually passed, rather than silently running a full weekday timetable of
 trains that are not running.
@@ -153,6 +158,7 @@ src/
 tools/
   gen_stations.py   GTFS -> src/stations.h
   gen_timetable.py  GTFS -> src/timetable_data.h
+  check_timetable_freshness.py  90-day expiry check (CI + weekly watch)
   board_dump.cpp    board model -> JSON, for the screenshot (host build)
   gen_screenshot.py that JSON -> docs/images/*.png
   probe_511.py      measures the live API; run before trusting assumptions

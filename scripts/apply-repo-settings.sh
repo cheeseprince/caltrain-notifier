@@ -71,13 +71,20 @@ echo "== branch protection on main (public repos only) =="
 # NO required approving reviews, deliberately. On a solo repository you cannot
 # approve your own pull request, so requiring one turns every merge into an
 # admin bypass -- a rubber stamp that is worse than an honest open gate.
+#
+# "Timetable freshness" still RUNS on every PR (ci.yml) but is deliberately NOT
+# required, for the same honest-gate reason: its result depends on Caltrain
+# publishing a newer GTFS feed, not on the PR under test. In 2026-11 the newest
+# feed still ended 2027-01-31, so a required freshness check blocked every merge
+# -- security bumps included -- with nothing any PR could do to turn it green.
+# The weekly .github/workflows/timetable-watch.yml opens an issue instead, so
+# the warning is not lost. Rationale in full: tools/check_timetable_freshness.py.
 if gh api -X PUT "repos/$REPO/branches/main/protection" --input - >/dev/null 2>&1 <<'JSON'
 {
   "required_status_checks": {
     "strict": false,
     "contexts": [
       "Secret scan",
-      "Timetable freshness",
       "Host tests",
       "Device build (caltrain)",
       "Device build (caltrain_v20)",
