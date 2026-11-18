@@ -71,7 +71,7 @@ jobs:
             sed 's/^::error:://' freshness.txt
             echo '```'
             echo
-            echo "Source of truth: \`tools/check_timetable_freshness.py\`. Procedure: [Keeping the timetable current](../blob/main/docs/DEVELOPMENT.md#keeping-the-timetable-current)."
+            echo "Source of truth: \`tools/check_timetable_freshness.py\`. Procedure: [Keeping the timetable current](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/main/docs/DEVELOPMENT.md#keeping-the-timetable-current)."
             echo
             echo "_Opened by \`.github/workflows/timetable-watch.yml\`, run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}._"
           } > body.md
