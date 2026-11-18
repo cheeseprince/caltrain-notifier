@@ -32,14 +32,26 @@
 
 namespace {
 
-// A plausible range for a real departure: any time this parser will ever be
-// asked to interpret is a live Caltrain SIRI feed value, so it should fall
-// within a sane calendar window. 2000-01-01 and 2100-01-01, both UTC --
-// generous on both sides of "now" so this is about catching parser garbage
-// (e.g. year 0000, or a date centuries out), not about being a strict
-// business-rule check.
-constexpr int64_t kPlausibleFloor = 946684800;    // 2000-01-01T00:00:00Z
-constexpr int64_t kPlausibleCeiling = 4102444800;  // 2100-01-01T00:00:00Z
+// The exact range of instants parseIso8601Utc() can legitimately return.
+// These are DERIVED FROM THE PARSER'S OWN CONTRACT, not picked as round
+// numbers -- the point is to catch parser garbage (year 0000, a date
+// centuries out, an offset applied twice), so the harness must accept every
+// value the parser is documented to accept, and nothing outside it.
+//
+// The parser bounds the LOCAL date to years 2000-2100 inclusive and the UTC
+// offset to -12:00..+14:00 (see src/siri_parse.cpp), then converts to UTC:
+//
+//   floor   = 2000-01-01T00:00:00+14:00  -> 1999-12-31T10:00:00Z
+//   ceiling = 2100-12-31T23:59:60-12:00  -> 2101-01-01T12:00:00Z
+//             (sec=60 is the leap-second allowance)
+//
+// History: these were once 2000-01-01Z and 2100-01-01Z. The fuzz smoke test
+// then found "2100-08-18T04:55:00Z" -- a value the parser correctly accepts
+// -- and aborted on it. The harness was wrong, not the parser. Both edges
+// are pinned in test/test_siri_parse.cpp and seeded in fuzz/seeds/, so the
+// harness and the parser cannot silently drift apart again.
+constexpr int64_t kPlausibleFloor = 946634400;     // 1999-12-31T10:00:00Z
+constexpr int64_t kPlausibleCeiling = 4134024000;  // 2101-01-01T12:00:00Z
 
 // A departure time of exactly 0 is siri_parse's OWN sentinel for "absent"
 // (see LiveDeparture's comments in siri_parse.h) and is filtered out before

@@ -113,6 +113,21 @@ int main() {
   check(parseIso8601Utc("1999-12-31T23:59:59Z") == 0, "year 1999 is one year below the minimum -> 0");
   check(parseIso8601Utc("2101-01-01T00:00:00Z") == 0, "year 2101 is one year above the maximum -> 0");
 
+  // The extreme UTC instants the parser can return, once the year window and
+  // the offset window (-12:00..+14:00) combine. The fuzz harness's
+  // kPlausibleFloor/kPlausibleCeiling (test/fuzz/fuzz_siri_parse.cpp) are
+  // these exact values; pinning them here means a change to either window
+  // fails this test instead of surfacing later as a fuzz "crash" on valid
+  // input -- which is what happened with "2100-08-18T04:55:00Z" when the
+  // harness ceiling was 2100-01-01Z. Values cross-checked with Python's
+  // datetime(..., tzinfo=timezone.utc).timestamp().
+  check(parseIso8601Utc("2000-01-01T00:00:00+14:00") == 946634400,
+        "earliest possible instant: year-2000 floor at +14:00 -> 1999-12-31T10:00Z");
+  check(parseIso8601Utc("2100-12-31T23:59:60-12:00") == 4134024000,
+        "latest possible instant: year-2100 ceiling + leap second at -12:00 -> 2101-01-01T12:00Z");
+  check(parseIso8601Utc("2100-08-18T04:55:00Z") == 4122248100,
+        "mid-2100 is inside the window (the fuzz input that exposed the old harness ceiling)");
+
   // Existing valid offsets from before this fix must still work unchanged.
   check(parseIso8601Utc("2026-08-08T11:00:00-07:00") == parseIso8601Utc("2026-08-08T18:00:00Z"),
         "-07:00 still accepted after adding offset validation");

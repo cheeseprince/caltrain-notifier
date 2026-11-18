@@ -102,9 +102,14 @@ pio run -e caltrain_es3c28p  # device build, QDtech ES3C28P 2.8"
 
 ## What CI checks
 
-Every push and pull request runs seven required jobs
-(`.github/workflows/ci.yml`): a checksum-pinned secret scan, timetable
-freshness, the host test suite, a device build for each board
-(`caltrain`, `caltrain_v20` and `caltrain_es3c28p`), and a bounded fuzz smoke
-test against `siri_parse.cpp`. A pull request cannot merge until all seven are
-green.
+Every push and pull request runs six required jobs
+(`.github/workflows/ci.yml`): a checksum-pinned secret scan, the host test
+suite, a device build for each board (`caltrain`, `caltrain_v20` and
+`caltrain_es3c28p`), and a bounded fuzz smoke test against `siri_parse.cpp`.
+A pull request cannot merge until all six are green.
+
+A seventh job, **timetable freshness**, also runs on every PR but is not
+required: it goes red when the compiled schedule is within 90 days of
+expiring, which depends on Caltrain publishing a new feed, not on your change.
+A red timetable check on your PR is not something you broke. The weekly
+`timetable-watch.yml` job tracks it as an issue instead.
